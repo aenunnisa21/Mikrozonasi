@@ -64,19 +64,28 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# SIDEBAR NAVIGATION & LOGO (VERSI ANTI-ERROR)
+# SIDEBAR NAVIGATION & LOGO (VERSI DUA LOGO RESMI UIN)
 # ==========================================
 with st.sidebar:
-    # Membuat tampilan Logo Box yang elegan dengan CSS khusus
-    st.markdown("""
-        <div style="background-color: #1E3A8A; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-            <span style="font-size: 35px;">🕌</span>
-            <h2 style="color: #FFFFFF; font-size: 20px; font-weight: bold; margin: 5px 0 0 0; font-family: 'Arial'; letter-spacing: 1px;">UIN SUNAN KALIJAGA</h2>
-            <p style="color: #F3F4F6; font-size: 11px; margin: 2px 0 0 0; opacity: 0.8;">YOGYAKARTA</p>
-        </div>
-    """, unsafe_allow_html=True)
+    # Kontainer utama untuk logo agar posisinya pas di tengah sidebar
+    col_l1, col_l2, col_l3 = st.columns([0.5, 4, 0.5])
+    with col_l2:
+        try:
+            # 1. Menampilkan Logo Bulat Hijau Utama UIN Sunan Kalijaga
+            logo_bulat = "https://upload.wikimedia.org/wikipedia/commons/e/e8/Logo_UIN_Sunan_Kalijaga.png"
+            st.image(logo_bulat, use_container_width=True)
             
-    st.markdown("<h3 style='text-align: center; margin-top: 10px; color: #111827; font-size: 18px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
+            # Memberi sedikit jarak vertikal antar logo
+            st.write("") 
+            
+            # 2. Menampilkan Logo Jaring Emas (Tulisan UIN) di bawahnya
+            logo_text = "https://raw.githubusercontent.com/ArisT06/peta-mikrozonasi/main/logo_uin_text.png"
+            st.image(logo_text, use_container_width=True)
+        except Exception as e:
+            # Cadangan darurat tekstual jika terjadi gangguan koneksi server luar
+            st.markdown("<h2 style='text-align: center; color: #1E3A8A; font-weight: bold;'>🕌 UIN SUKA</h2>", unsafe_allow_html=True)
+
+    st.markdown("<h3 style='text-align: center; margin-top: 15px; color: #111827; font-size: 18px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 13px; color: #6B7280; margin-top: -10px;'>Analisis Mikrotremor HVSR</p>", unsafe_allow_html=True)
     st.markdown("---")
             
