@@ -64,28 +64,17 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# SIDEBAR NAVIGATION & LOGO (VERSI DUA LOGO RESMI UIN)
+# SIDEBAR NAVIGATION & LOGO (VERSI LOGO BULAT ONLY)
 # ==========================================
 with st.sidebar:
-    # Kontainer utama untuk logo agar posisinya pas di tengah sidebar
-    col_l1, col_l2, col_l3 = st.columns([0.5, 4, 0.5])
-    with col_l2:
-        try:
-            # 1. Menampilkan Logo Bulat Hijau Utama UIN Sunan Kalijaga
-            logo_bulat = "https://upload.wikimedia.org/wikipedia/commons/e/e8/Logo_UIN_Sunan_Kalijaga.png"
-            st.image(logo_bulat, use_container_width=True)
+    # Memanggil file logo_uin.png langsung dari repository GitHub kamu
+    try:
+        st.image("logo_uin.png", use_container_width=True)
+    except:
+        # Jika file belum terunggah sempurna, gunakan alternatif ikon bawaan yang rapi
+        st.markdown("<h1 style='text-align: center; color: #0D9488;'>🕌</h1>", unsafe_allow_html=True)
             
-            # Memberi sedikit jarak vertikal antar logo
-            st.write("") 
-            
-            # 2. Menampilkan Logo Jaring Emas (Tulisan UIN) di bawahnya
-            logo_text = "https://raw.githubusercontent.com/ArisT06/peta-mikrozonasi/main/logo_uin_text.png"
-            st.image(logo_text, use_container_width=True)
-        except Exception as e:
-            # Cadangan darurat tekstual jika terjadi gangguan koneksi server luar
-            st.markdown("<h2 style='text-align: center; color: #1E3A8A; font-weight: bold;'>🕌 UIN SUKA</h2>", unsafe_allow_html=True)
-
-    st.markdown("<h3 style='text-align: center; margin-top: 15px; color: #111827; font-size: 18px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; margin-top: 10px; color: #111827; font-size: 18px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 13px; color: #6B7280; margin-top: -10px;'>Analisis Mikrotremor HVSR</p>", unsafe_allow_html=True)
     st.markdown("---")
             
