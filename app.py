@@ -175,7 +175,7 @@ elif menu == "Analisis Kerentanan":
         """, unsafe_allow_html=True)
 
 # ==========================================
-# MENU 4: MIKROZONASI (3 PETA 3D HIGH-RELIEF BERJAJAR SEPERTI SURFER/QGIS)
+# MENU 4: MIKROZONASI (DENGAN BASEMAP SURFACE & TEXTURE)
 # ==========================================
 elif menu == "Mikrozonasi":
     st.markdown('<div class="main-title">Peta Kerentanan Seismik & Model Spasial 3D</div>', unsafe_allow_html=True)
@@ -183,10 +183,27 @@ elif menu == "Mikrozonasi":
     if df is None:
         st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
     else:
-        # PETA INTERAKTIF UTAMA (FOLIUM)
-        st.markdown('<div class="section-title">Peta Distribusi Spasial Titik Pengukuran</div>', unsafe_allow_html=True)
+        # PETA INTERAKTIF UTAMA DENGAN BASEMAP TERRAIN (PERMUKAAN BUMI RIIL)
+        st.markdown('<div class="section-title">Peta 1: Overlay Parameter Seismik di Atas Basemap Permukaan Bumi (Terrain)</div>', unsafe_allow_html=True)
+        st.write("Peta di bawah ini menggunakan basemap khusus untuk memperlihatkan kontur relief permukaan bumi asli (lembah dan bukit) di area penelitian.")
+        
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
+        
+        # Menggunakan basemap Terrain agar tekstur permukaan bumi terlihat jelas
+        m = folium.Map(
+            location=[center_lat, center_lon], 
+            zoom_start=14,
+            tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            attr='&copy; OpenTopoMap contributors'
+        )
+        
+        # Menambahkan pilihan basemap Satelit Google jika ingin melihat permukaan foto udara
+        folium.TileLayer(
+            tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+            attr='Google Satellite',
+            name='Google Satellite',
+            overlay=False
+        ).add_to(m)
         
         for _, row in df.iterrows():
             tooltip_info = f"Stasiun: {row['Titik']}"
@@ -203,12 +220,15 @@ elif menu == "Mikrozonasi":
             </div>
             """
             folium.CircleMarker(
-                location=[row['Latitude'], row['Longitude']], radius=9,
+                location=[row['Latitude'], row['Longitude']], radius=10,
                 popup=folium.Popup(popup_html, max_width=250), tooltip=tooltip_info,
-                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
+                color='black', weight=1,
+                fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=0.9
             ).add_to(m)
-        
-        st_folium(m, width=1100, height=400)
+            
+        folium.LayerControl().add_to(m)
+        st_folium(m, width=1100, height=450)
+        st.caption("💡 *Petunjuk: Anda bisa mengubah tampilan permukaan ke mode Satelit Riil atau Topografi menggunakan tombol layer di pojok kanan atas peta.*")
         
         # PROSES INTERPOLASI IDW GRID
         x, y = df['Longitude'].values, df['Latitude'].values
@@ -220,65 +240,23 @@ elif menu == "Mikrozonasi":
         zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # VISUALISASI 3 PETA 3D SURFACE SEJAJAR (SOLID HIGH-RELIEF)
-        st.markdown('<div class="section-title">Peta 3D Surface Model Parameter Seismik (Hasil Konstruksi)</div>', unsafe_allow_html=True)
+        # VISUALISASI 3 PETA 3D SURFACE SEJAJAR DENGAN GRID TEKSTUR RAPAT (SIMULASI BASMEAP)
+        st.markdown('<div class="section-title">Peta 2: 3D Surface Model dengan Efek Tekstur Kontur Permukaan</div>', unsafe_allow_html=True)
         
         col_3a, col_3b, col_3c = st.columns(3)
         
-        # Parameter shading matahari buatan biar relief bertekstur tebal
-        high_relief_lighting = dict(ambient=0.6, diffuse=0.8, fresnel=0.2, specular=0.5, roughness=0.1)
+        # Optimasi shading & pencahayaan ekstrem agar guratan tekstur permukaan menonjol keluar
+        high_relief_lighting = dict(
+            ambient=0.5,
+            diffuse=0.9,
+            fresnel=0.4,
+            specular=0.6,
+            roughness=0.2
+        )
         
-        with col_3a:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>3D Site Amplification (A0)</h4>", unsafe_allow_html=True)
-            fig3_a0 = go.Figure(data=[go.Surface(
-                z=zi_a0, x=x_line, y=y_line, colorscale='Viridis',
-                lighting=high_relief_lighting,
-                contours_z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project_z=True)
-            )])
-            fig3_a0.update_layout(
-                scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='Ao', aspectratio=dict(x=1, y=1, z=0.6)),
-                margin=dict(l=0, r=0, b=10, t=10), height=450
-            )
-            st.plotly_chart(fig3_a0, use_container_width=True)
-            st.caption("➔ Bukit tinggi menunjukkan area pelunakan dengan pembesaran gelombang seismik besar.")
-            
-        with col_3b:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>3D Dominant Frequency (f0)</h4>", unsafe_allow_html=True)
-            fig3_f0 = go.Figure(data=[go.Surface(
-                z=zi_f0, x=x_line, y=y_line, colorscale='Plasma',
-                lighting=high_relief_lighting,
-                contours_z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project_z=True)
-            )])
-            fig3_f0.update_layout(
-                scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='f0 (Hz)', aspectratio=dict(x=1, y=1, z=0.6)),
-                margin=dict(l=0, r=0, b=10, t=10), height=450
-            )
-            st.plotly_chart(fig3_f0, use_container_width=True)
-            st.caption("➔ Lembah curam mengindikasikan ketebalan endapan aluvium/sedimen permukaan yang tebal.")
-            
-        with col_3c:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>3D Seismic Vulnerability (Kg)</h4>", unsafe_allow_html=True)
-            fig3_kg = go.Figure(data=[go.Surface(
-                z=zi_kg, x=x_line, y=y_line, colorscale='Jet',
-                lighting=high_relief_lighting,
-                contours_z=dict(show=True, usecolormap=True, highlightcolor="white", project_z=True)
-            )])
-            fig3_kg.update_layout(
-                scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='Kg', aspectratio=dict(x=1, y=1, z=0.6)),
-                margin=dict(l=0, r=0, b=10, t=10), height=450
-            )
-            st.plotly_chart(fig3_kg, use_container_width=True)
-            st.caption("➔ Akumulasi zona bahaya mikrozonasi. Puncak anomali merah wajib dihindari untuk konstruksi vital.")
-
-        st.markdown("""
-        <div class="ref-box">
-        <b>Pedoman Teoretis Klasifikasi Struktur Lapisan Tanah Berdasarkan Klas Kanai (1983):</b><br>
-        • <b>Klas I (f0 > 10 Hz):</b> Batuan Keras, jenis batuan kristalin atau hasil bentukan Tersier (deformasi minimal).<br>
-        • <b>Klas II (4 ≤ f0 ≤ 10 Hz):</b> Tanah Padat, batuan berupa aluvium dengan ketebalan tipis atau pasir padat.<br>
-        • <b>Klas III (1 ≤ f0 < 4 Hz):</b> Sedimen Sedang, lapisan aluvium tua dengan ketebalan medium.<br>
-        • <b>Klas IV (f0 < 1 Hz):</b> Sedimen Tebal / Tanah Lunak, terbentuk dari endapan aluvium muda hasil sedimentasi rawa/sungai yang tebal.
-        </div>
-        """, unsafe_allow_html=True)
+        # Pengaturan garis kontur badan jaring agar membentuk bayangan relief bergaris rapat
+        surface_contours = dict(
+            x=dict(show=True, start=x_line.min(), end=x_line.max(), size=(x_line.max()-x_line.min())/20, color="
 
 # ==========================================
 # MENU 5: ANALISIS RESONANSI
