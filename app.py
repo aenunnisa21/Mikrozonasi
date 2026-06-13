@@ -217,44 +217,120 @@ elif menu == "Mikrozonasi":
         st_folium(m, width=1100, height=450)
         st.caption("💡 *Arahkan kursor ke titik untuk melihat nama stasiun, klik pada titik untuk memunculkan ringkasan parameter geofisika lengkap.*")
         
-        # 3 PETA KONTUR (A0, f0, Kg) BERJUDUL JELAS
-        st.markdown('<div class="section-title">Peta Kontur Interpolasi Spasial (Metode IDW)</div>', unsafe_allow_html=True)
+# ==========================================
+# MENU 4: MIKROZONASI (3 PETA BERJUDUL & RAPI)
+# ==========================================
+elif menu == "Mikrozonasi":
+    st.markdown('<div class="main-title">Peta Mikrozonasi Seismik Daerah Penelitian</div>', unsafe_allow_html=True)
+    df = st.session_state.df_data
+    if df is None:
+        st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
+    else:
+        # 1. PETA INTERAKTIF UTAMA (FOLIUM) WITH INTERACTIVE TOOLTIP & POPUP
+        st.markdown('<div class="section-title">Peta 1: Distribusi Spasial Titik Pengukuran & Lokasi Kerentanan</div>', unsafe_allow_html=True)
+        st.write("Peta di bawah ini menunjukkan posisi geografis riil stasiun perekaman mikrotremor beserta klasifikasi tingkat kerentanannya.")
         
+        center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
+        m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
+        
+        for _, row in df.iterrows():
+            tooltip_info = f"Stasiun: {row['Titik']} (Klik untuk detail)"
+            popup_html = f"""
+            <div style='font-family: Arial, sans-serif; font-size: 12px; width: 220px; line-height: 1.4;'>
+                <h4 style='margin:0 0 5px 0; color:#1E3A8A;'>Stasiun {row['Titik']}</h4>
+                <hr style='border:none; border-top:1px solid #CCC; margin:5px 0;'>
+                <b>Koordinat:</b> {row['Latitude']:.5f}, {row['Longitude']:.5f}<br>
+                <b>Frekuensi (f₀):</b> {row['f0']:.2f} Hz<br>
+                <b>Amplifikasi (A₀):</b> {row['A0']:.2f}<br>
+                <b>Nilai Kerentanan (K_g):</b> {row['Kg']:.2f}<br>
+                <b>Status Risiko:</b> <span style='color:{color_picker_kg(row['Tingkat Kerentanan'])}; font-weight:bold;'>{row['Tingkat Kerentanan']}</span><br>
+                <b>Karakteristik:</b> {row['Karakteristik Tanah']}
+            </div>
+            """
+            folium.CircleMarker(
+                location=[row['Latitude'], row['Longitude']], radius=9,
+                popup=folium.Popup(popup_html, max_width=250),
+                tooltip=tooltip_info,
+                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
+            ).add_to(m)
+        
+        st_folium(m, width=1100, height=450)
+        st.caption("💡 *Petunjuk Pengguna: Arahkan kursor ke lingkaran untuk melihat nama stasiun. Klik pada lingkaran untuk memunculkan jendela informasi parameter fisis lengkap.*")
+        
+        # INTERPOLASI DATA GRID (IDW)
         x, y = df['Longitude'].values, df['Latitude'].values
-        xi = np.linspace(x.min() - 0.005, x.max() + 0.005, 100)
-        yi = np.linspace(y.min() - 0.005, y.max() + 0.005, 100)
+        xi = np.linspace(x.min() - 0.003, x.max() + 0.003, 100)
+        yi = np.linspace(y.min() - 0.003, y.max() + 0.003, 100)
         xi, yi = np.meshgrid(xi, yi)
         
-        k_col1, k_col2, k_col3 = st.columns(3)
+        zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
+        zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
+        zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        with k_col1:
-            st.write("### Peta Kontur Faktor Amplifikasi ($A_0$)")
-            zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
-            fig_a0 = go.Figure(data=go.Contour(z=zi_a0, x=np.linspace(x.min()-0.005, x.max()+0.005, 100), y=np.linspace(y.min()-0.005, y.max()+0.005, 100), colorscale='Viridis', contours_coloring='heatmap'))
-            st.plotly_chart(fig_a0, use_container_width=True)
-            st.caption("Menunjukkan perbesaran gelombang. Nilai tinggi berkorelasi dengan lapisan melunak.")
+        # MEMBUAT PILIHAN VIEW TABS AGAR RAPI DAN TIDAK MELEBAR
+        st.markdown('<div class="section-title">Peta 2: Kontur Interpolasi Parameter Seismik Mikrozonasi</div>', unsafe_allow_html=True)
+        tab_2d, tab_3d = st.tabs(["📊 Peta Kontur 2D (Standard)", "🌋 Model Permukaan 3D (Interaktif)"])
+        
+        # --- VIEW KONTUR 2D ---
+        with tab_2d:
+            st.write("Berikut adalah hasil rekonstruksi penampang dua dimensi dari variasi nilai parameter lokal menggunakan algoritma pembobotan jarak (IDW):")
+            col_a, col_b, col_c = st.columns(3)
             
-        with k_col2:
-            st.write("### Peta Kontur Frekuensi Dominan ($f_0$)")
-            zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
-            fig_f0 = go.Figure(data=go.Contour(z=zi_f0, x=np.linspace(x.min()-0.005, x.max()+0.005, 100), y=np.linspace(y.min()-0.005, y.max()+0.005, 100), colorscale='Plasma', contours_coloring='heatmap'))
-            st.plotly_chart(fig_f0, use_container_width=True)
-            st.caption("Menunjukkan ketebalan sedimen. Semakin kecil f0, lapisan sedimen penutup semakin tebal.")
-            
-        with k_col3:
-            st.write("### Peta Kontur Indeks Kerentanan Seismik ($K_g$)")
-            zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
-            fig_kg = go.Figure(data=go.Contour(z=zi_kg, x=np.linspace(x.min()-0.005, x.max()+0.005, 100), y=np.linspace(y.min()-0.005, y.max()+0.005, 100), colorscale='Jet', contours_coloring='heatmap'))
-            st.plotly_chart(fig_kg, use_container_width=True)
-            st.caption("Akumulasi tingkat kerentanan zonasi bangunan berdasarkan standardisasi efek tapak lokal.")
+            with col_a:
+                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2A. Kontur Frekuensi Dominan (f₀)</h4>", unsafe_allow_html=True)
+                fig2_f0 = go.Figure(data=go.Contour(z=zi_f0, x=np.linspace(x.min()-0.003, x.max()+0.003, 100), y=np.linspace(y.min()-0.003, y.max()+0.003, 100), colorscale='Plasma', contours_coloring='heatmap'))
+                fig2_f0.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
+                st.plotly_chart(fig2_f0, use_container_width=True)
+                st.caption("➔ **Interpretasi:** Nilai f₀ rendah mencerminkan ketebalan lapisan sedimen permukaan lunak yang tebal (Zonasi Aluvium).")
+                
+            with col_b:
+                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2B. Kontur Faktor Amplifikasi (A₀)</h4>", unsafe_allow_html=True)
+                fig2_a0 = go.Figure(data=go.Contour(z=zi_a0, x=np.linspace(x.min()-0.003, x.max()+0.003, 100), y=np.linspace(y.min()-0.003, y.max()+0.003, 100), colorscale='Viridis', contours_coloring='heatmap'))
+                fig2_a0.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
+                st.plotly_chart(fig2_a0, use_container_width=True)
+                st.caption("➔ **Interpretasi:** Area kontur rapat bernilai tinggi menunjukkan batas zona kontras impedansi gelombang seismik tinggi.")
+                
+            with col_c:
+                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2C. Kontur Kerentanan Seismik (Kg)</h4>", unsafe_allow_html=True)
+                fig2_kg = go.Figure(data=go.Contour(z=zi_kg, x=np.linspace(x.min()-0.003, x.max()+0.003, 100), y=np.linspace(y.min()-0.003, y.max()+0.003, 100), colorscale='Jet', contours_coloring='heatmap'))
+                fig2_kg.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
+                st.plotly_chart(fig2_kg, use_container_width=True)
+                st.caption("➔ **Interpretasi:** Daerah anomalus merah fisis-teoritis merupakan zona kritis rawan kerusakan gempa wilayah setempat.")
 
+        # --- VIEW SURFACE 3D ---
+        with tab_3d:
+            st.write("Gunakan kursor mouse Anda (klik, tahan, dan geser) untuk memutar atau melihat elevasi parameter fisis secara tiga dimensi:")
+            col_3a, col_3b, col_3c = st.columns(3)
+            
+            with col_3a:
+                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3A. Surface 3D Frekuensi (f₀)</h4>", unsafe_allow_html=True)
+                fig3_f0 = go.Figure(data=[go.Surface(z=zi_f0, x=xi, y=yi, colorscale='Plasma')])
+                fig3_f0.update_layout(scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='f0 (Hz)'), margin=dict(l=0, r=0, b=10, t=10), height=380)
+                st.plotly_chart(fig3_f0, use_container_width=True)
+                st.caption("Lembah curam ke bawah menandakan struktur cekungan sedimen purba.")
+                
+            with col_3b:
+                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3B. Surface 3D Amplifikasi (A₀)</h4>", unsafe_allow_html=True)
+                fig3_a0 = go.Figure(data=[go.Surface(z=zi_a0, x=xi, y=yi, colorscale='Viridis')])
+                fig3_a0.update_layout(scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='A0'), margin=dict(l=0, r=0, b=10, t=10), height=380)
+                st.plotly_chart(fig3_a0, use_container_width=True)
+                st.caption("Puncak bukit menunjukkan faktor perbesaran energi gelombang seismik lokal.")
+                
+            with col_3c:
+                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3C. Surface 3D Kerentanan (Kg)</h4>", unsafe_allow_html=True)
+                fig3_kg = go.Figure(data=[go.Surface(z=zi_kg, x=xi, y=yi, colorscale='Jet')])
+                fig3_kg.update_layout(scene=dict(xaxis_title='Long', yaxis_title='Lat', zaxis_title='Kg'), margin=dict(l=0, r=0, b=10, t=10), height=380)
+                st.plotly_chart(fig3_kg, use_container_width=True)
+                st.caption("Tonjolan merah ekstrem wajib dihindari untuk perencanaan infrastruktur vital.")
+
+        # REFERENSI VALID ILMIAH JURNAL
         st.markdown("""
         <div class="ref-box">
-        <b>Referensi Klasifikasi Karakteristik Tanah Berdasarkan Frekuensi Dominan f0 (Kanai, 1983):</b><br>
-        • <b>Klas I (f0 > 10 Hz):</b> Batuan Keras, jenis batuan kristalin atau hasil bentukan Tersier (deformasi minimal).<br>
-        • <b>Klas II (4 ≤ f0 ≤ 10 Hz):</b> Tanah Padat, batuan berupa aluvium dengan ketebalan tipis atau pasir padat.<br>
-        • <b>Klas III (1 ≤ f0 < 4 Hz):</b> Sedimen Sedang, lapisan aluvium tua dengan ketebalan medium.<br>
-        • <b>Klas IV (f0 < 1 Hz):</b> Sedimen Tebal / Tanah Lunak, terbentuk dari endapan aluvium muda hasil sedimentasi rawa/sungai yang tebal.
+        <b>Pedoman Teoretis Klasifikasi Struktur Lapisan Tanah Berdasarkan Klas Kanai (1983) & SESAME (2004):</b><br>
+        1. <b>Batuan Keras / Hard Rock ($f_0 > 10$ Hz):</b> Tipe tanah Klas I. Aluvium sangat tipis terbentuk dari batuan Tersier. Aman dari risiko keruntuhan besar.<br>
+        2. <b>Tanah Padat / Sedimen Tipis ($4 \le f_0 \le 10$ Hz):</b> Tipe tanah Klas II. Lapisan berupa pasir padat, kerikil, atau endapan pengisi aluvium muda berketebalan tipis.<br>
+        3. <b>Sedimen Sedang ($1 \le f_0 < 4$ Hz):</b> Tipe tanah Klas III. Karakteristik batuan penyusun berupa aluvium tua dengan ketebalan medium (banyak ditemukan di area pemukiman dataran).<br>
+        4. <b>Tanah Lunak / Sedimen Tebal ($f_0 < 1$ Hz):</b> Tipe tanah Klas IV. Lapisan tanah hasil endapan rawa, delta sungai, atau sedimen longgar berukuran tebal. Sangat rawan likuefaksi dan pergeseran tanah.
         </div>
         """, unsafe_allow_html=True)
 
