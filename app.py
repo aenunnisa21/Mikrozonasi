@@ -16,17 +16,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS untuk layout dashboard Geofisika
 st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; margin-bottom: 20px; }
     .section-title { font-size: 24px; font-weight: bold; color: #0D9488; margin-top: 25px; margin-bottom: 15px; border-bottom: 2px solid #0D9488; padding-bottom: 5px; }
     .metric-box { background-color: #F3F4F6; padding: 15px; border-radius: 10px; border-left: 5px solid #1E3A8A; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
-    .ref-box { background-color: #EFF6FF; padding: 15px; border-radius: 8px; border-left: 5px solid #3B82F6; margin-top: 15px; font-size: 13px; }
+    .ref-box { background-color: #EFF6FF; padding: 15px; border-radius: 8px; border-left: 5px solid #3B82F6; margin-top: 15px; font-size: 13px; color: #1E3A8A; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# GEOPHYSICAL FUNCTIONS & REFERENCES
+# FUNGSI GEOFISIKA & INTERPOLASI
 # ==========================================
 def calculate_kg(a0, f0):
     return (a0 ** 2) / f0
@@ -162,7 +163,7 @@ elif menu == "Analisis Kerentanan":
             st.plotly_chart(fig_scatter, use_container_width=True)
 
 # ==========================================
-# MENU 4: MIKROZONASI (3D SOLID BLOCK MODEL ALA SOFTWARE SURFER)
+# MENU 4: MIKROZONASI (SURFER SOFTWARE ENGINE REPLICA)
 # ==========================================
 elif menu == "Mikrozonasi":
     st.markdown('<div class="main-title">Peta Kerentanan Seismik & Model Spasial 3D</div>', unsafe_allow_html=True)
@@ -170,124 +171,38 @@ elif menu == "Mikrozonasi":
     if df is None:
         st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
     else:
-        # PROSES INTERPOLASI IDW GRID (RESOLUSI RAPAT UNTUK SURFER STYLE)
+        # 1. PETA GIS MAPBOX (MENAMPILKAN PERMUKAAN BUMI NYATA / RELEIF TERRAIN)
+        st.markdown('<div class="section-title">Peta 1: GIS Overlay Parameter Seismik pada Basemap Terrain Bumi</div>', unsafe_allow_html=True)
+        center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
+        
+        m = folium.Map(
+            location=[center_lat, center_lon], zoom_start=14,
+            tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            attr='&copy; OpenTopoMap'
+        )
+        for _, row in df.iterrows():
+            popup_html = f"<b>Stasiun {row['Titik']}</b><br>f₀: {row['f0']:.2f} Hz<br>A₀: {row['A0']:.2f}<br>K_g: {row['Kg']:.2f}"
+            folium.CircleMarker(
+                location=[row['Latitude'], row['Longitude']], radius=9,
+                popup=folium.Popup(popup_html, max_width=200),
+                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
+            ).add_to(m)
+        st_folium(m, width=1100, height=350)
+        
+        # 2. PEMBUATAN REPLIKA MODEL 3D VOLCANO/HILLSHADE RELEIF SURFACE Khas SURFER
         x, y = df['Longitude'].values, df['Latitude'].values
-        x_line = np.linspace(x.min() - 0.002, x.max() + 0.002, 60)
-        y_line = np.linspace(y.min() - 0.002, y.max() + 0.002, 60)
+        x_line = np.linspace(x.min() - 0.002, x.max() + 0.002, 70)
+        y_line = np.linspace(y.min() - 0.002, y.max() + 0.002, 70)
         xi, yi = np.meshgrid(x_line, y_line)
         
+        # Generator Topografi Buatan Tinggi-Rendah (Sumbu Z) agar membentuk morfologi gunung/bukit bertekstur tajam
+        r = np.sqrt((xi - center_lon)**2 + (yi - center_lat)**2) * 1200
+        z_mountain = 1000 * np.exp(-r/6) + 140 * np.sin(xi*1600) * np.cos(yi*1600)
+        
+        # Interpolasi nilai HVSR untuk disuntikkan sebagai warna penutup lereng
         zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        st.markdown('<div class="section-title">3D Solid Block Model Parameter Seismik (Surfer Software Style)</div>', unsafe_allow_html=True)
-        st.write("Model di bawah ini dikonstruksi menggunakan proyeksi dinding solid bawah dan kontur lantai dasar agar identik dengan output cetakan perangkat lunak Surfer.")
-        
+        st.markdown('<div class="section-title">Peta 2: 3D Surface Model Parameter Seismik (Surfer Style)</div>', unsafe_allow_html=True)
         col_3a, col_3b, col_3c = st.columns(3)
-        
-        # PENGATURAN TEKSTUR & PENCAHAYAAN MATTE ALA SURFER
-        surfer_lighting = dict(
-            ambient=0.7,      # Mengurangi bayangan gelap ekstrem
-            diffuse=0.8,      # Menyebarkan warna merata di lereng
-            fresnel=0.1,      # Menghilangkan pantulan kilap plastik
-            specular=0.1,     # Permukaan doff/matte
-            roughness=0.9
-        )
-        
-        # FUNGSI UNTUK MEMBUAT BLOK 3D DENGAN PROYEKSI LANTAI & DINDING
-        def create_surfer_block(zi_data, title_name, colorscale_name, z_min, z_max):
-            fig = go.Figure(data=[go.Surface(
-                z=zi_data, x=x_line, y=y_line,
-                colorscale=colorscale_name,
-                lighting=surfer_lighting,
-                showscale=True,
-                colorbar=dict(
-                    title=title_name,
-                    thickness=15,
-                    len=0.7,
-                    titleside="top"
-                ),
-                # 1. Membuat Garis Kontur di Atas Permukaan Bukit
-                contours_z=dict(
-                    show=True,
-                    usecolormap=False,
-                    highlightcolor="black",
-                    project_z=True,   # <-- INI MEMBUAT PROYEKSI KONTUR DI LANTAI DASAR
-                    start=float(np.min(zi_data)),
-                    end=float(np.max(zi_data)),
-                    size=float((np.max(zi_data) - np.min(zi_data)) / 12),
-                    color="rgba(0, 0, 0, 0.4)",
-                    width=1.5
-                )
-            )])
-            
-            # 2. Rekayasa Tampilan Dinding Kotak Padat (Solid Box Base)
-            z_floor = float(np.min(zi_data) - (np.max(zi_data) - np.min(zi_data))*0.4)
-            
-            fig.update_layout(
-                scene=dict(
-                    xaxis=dict(title='Longitude', gridcolor='rgba(0,0,0,0.1)', backgroundcolor="white", showbackground=True),
-                    yaxis=dict(title='Latitude', gridcolor='rgba(0,0,0,0.1)', backgroundcolor="white", showbackground=True),
-                    zaxis=dict(
-                        title=title_name, 
-                        range=[z_floor, float(np.max(zi_data) * 1.1)],
-                        gridcolor='rgba(0,0,0,0.1)',
-                        backgroundcolor="rgba(230,230,230,0.5)", # Sisi samping abu-abu solid
-                        showbackground=True
-                    ),
-                    aspectratio=dict(x=1, y=1, z=0.5),
-                    camera=dict(eye=dict(x=1.3, y=-1.3, z=0.9)) # Sudut pandang isometrik khas Surfer
-                ),
-                margin=dict(l=0, r=0, b=0, t=30),
-                height=480
-            )
-            return fig
-
-        # Render 3 Peta Berjajar secara Otomatis
-        with col_3a:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size: 16px;'>3A. 3D Site Amplification (Ao)</h4>", unsafe_allow_html=True)
-            fig_a0 = create_surfer_block(zi_a0, "Ao", "Viridis", df['A0'].min(), df['A0'].max())
-            st.plotly_chart(fig_a0, use_container_width=True)
-            
-        with col_3b:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size: 16px;'>3B. 3D Dominant Frequency (f0)</h4>", unsafe_allow_html=True)
-            fig_f0 = create_surfer_block(zi_f0, "f0 (Hz)", "Plasma", df['f0'].min(), df['f0'].max())
-            st.plotly_chart(fig_f0, use_container_width=True)
-            
-        with col_3c:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size: 16px;'>3C. 3D Seismic Vulnerability (Kg)</h4>", unsafe_allow_html=True)
-            fig_kg = create_surfer_block(zi_kg, "Kg", "Jet", df['Kg'].min(), df['Kg'].max())
-            st.plotly_chart(fig_kg, use_container_width=True)
-
-        st.markdown("""
-        <div class="ref-box">
-        <b>Pedoman Klasifikasi Lapisan Tanah (Klas Kanai, 1983 & Nakamura, 1997):</b><br>
-        • <b>Anomali Bukit Tinggi / Warna Merah (Kg):</b> Merupakan zona rawan deformasi tinggi akibat akumulasi lapisan sedimen lunak lokal.<br>
-        • <b>Proyeksi Kontur Dasar:</b> Mem
-
-# ==========================================
-# MENU 5: ANALISIS RESONANSI
-# ==========================================
-elif menu == "Analisis Resonansi":
-    st.markdown('<div class="main-title">Analisis Risiko Resonansi Struktur Bangunan</div>', unsafe_allow_html=True)
-    df = st.session_state.df_data
-    if df is None:
-        st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
-    else:
-        num_floors = st.number_input("Masukkan Jumlah Lantai Bangunan yang Akan Disimulasikan (N):", min_value=1, max_value=50, value=3)
-        fb = 10.0 / num_floors
-        st.markdown(f'<div class="metric-box"><b>Estimasi Frekuensi Alami Bangunan (fb):</b> <h2>{fb:.2f} Hz</h2></div>', unsafe_allow_html=True)
-        
-        def evaluate_resonance(f0, fb):
-            diff = abs(f0 - fb)
-            if diff <= 0.5: return "Risiko Tinggi (Bahaya)"
-            elif 0.5 < diff <= 1.5: return "Risiko Sedang (Waspada)"
-            return "Risiko Rendah (Aman)"
-            
-        df_res = df[['Titik', 'f0', 'A0']].copy()
-        df_res['fb (Freq Bangunan)'] = round(fb, 2)
-        df_res['Selisih |f0 - fb| (Hz)'] = round(abs(df_res['f0'] - fb), 2)
-        df_res['Status Risiko Resonansi'] = df_res['f0'].apply(lambda x: evaluate_resonance(x, fb))
-        
-        st.markdown('<div class="section-title">Tabel Hasil Perhitungan Skenario Resonansi Seismik</div>', unsafe_allow_html=True)
-        st.dataframe(df_res, use_container_width=True)
