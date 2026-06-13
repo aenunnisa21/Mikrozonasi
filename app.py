@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 import folium
 from streamlit_folium import st_folium
@@ -33,13 +32,11 @@ def calculate_kg(a0, f0):
     return (a0 ** 2) / f0
 
 def classify_kg(kg):
-    # Klasifikasi Indeks Kerentanan Seismik berdasarkan Nakamura (1997)
     if kg < 3: return "Rendah"
     elif 3 <= kg <= 6: return "Menengah"
     else: return "Tinggi"
 
 def classify_soil(f0):
-    # Klasifikasi Klas Tanah berdasarkan Kanai (1983)
     if f0 > 10: return "Klas I (Batuan Keras / Hard Rock)"
     elif 4 <= f0 <= 10: return "Klas II (Tanah Padat / Aluvium Ringan)"
     elif 1 <= f0 < 4: return "Klas III (Sedimen Sedang / Aluvium Tua)"
@@ -64,22 +61,18 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# SIDEBAR NAVIGATION & LOGO (VERSI LOGO BULAT ONLY)
+# SIDEBAR NAVIGATION & LOGO AMAN
 # ==========================================
 with st.sidebar:
-    # Memanggil file logo_uin.png langsung dari repository GitHub kamu
     try:
+        # Membaca file logo_uin.png dari repository GitHub Anda
         st.image("logo_uin.png", use_container_width=True)
     except:
-        # Jika file belum terunggah sempurna, gunakan alternatif ikon bawaan yang rapi
-        st.markdown("<h1 style='text-align: center; color: #0D9488;'>🕌</h1>", unsafe_allow_html=True)
+        # Jika file belum di-upload, tampilkan simbol masjid rapi agar tidak kuning error
+        st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>Public Domain</h1>", unsafe_allow_html=True)
             
     st.markdown("<h3 style='text-align: center; margin-top: 10px; color: #111827; font-size: 18px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 13px; color: #6B7280; margin-top: -10px;'>Analisis Mikrotremor HVSR</p>", unsafe_allow_html=True)
-    st.markdown("---")
-            
-    st.title("GEOFISIKA UIN SUKA")
-    st.subheader("Analisis Mikrotremor HVSR")
     st.markdown("---")
     
     menu = st.radio(
@@ -98,7 +91,7 @@ if menu == "Home":
     st.markdown("""
     ### Deskripsi Aplikasi
     Aplikasi ini dirancang untuk melakukan standarisasi pengolahan lanjut data hasil *Horizontal-to-Vertical Spectral Ratio* (HVSR) mikrotremor. 
-    Melalui integrasi parameter frekuensi dominan ($f_0$) dan amplifikasi ($A_0$), sistem melakukan pemetaan bahaya lokal (*local site effect*) guna mendukung mitigasi bencana gempa bumi regional.
+    Melalui integrasi parameter frekuensi dominan ($f_0$) and amplifikasi ($A_0$), sistem melakukan pemetaan bahaya lokal (*local site effect*) guna mendukung mitigasi bencana gempa bumi regional.
     """)
 
 # ==========================================
@@ -134,7 +127,7 @@ elif menu == "Upload Data":
         st.dataframe(st.session_state.df_data, use_container_width=True)
 
 # ==========================================
-# MENU 3: ANALISIS KERENTANAN (REVISI STATISTIK JELAS)
+# MENU 3: ANALISIS KERENTANAN
 # ==========================================
 elif menu == "Analisis Kerentanan":
     st.markdown('<div class="main-title">Analisis Kerentanan Seismik & Statistik Detail</div>', unsafe_allow_html=True)
@@ -142,238 +135,7 @@ elif menu == "Analisis Kerentanan":
     if df is None:
         st.warning("Silakan upload data CSV terlebih dahulu.")
     else:
-        # Nilai Ringkasan Utama
         col1, col2, col3 = st.columns(3)
         with col1: st.markdown(f'<div class="metric-box"><b>Rata-rata f0 (Frekuensi Dominan)</b><h2>{df["f0"].mean():.2f} Hz</h2></div>', unsafe_allow_html=True)
         with col2: st.markdown(f'<div class="metric-box"><b>Rata-rata A0 (Amplifikasi)</b><h2>{df["A0"].mean():.2f}</h2></div>', unsafe_allow_html=True)
-        with col3: st.markdown(f'<div class="metric-box"><b>Rata-rata Kg (Indeks Kerentanan)</b><h2>{df["Kg"].mean():.2f}</h2></div>', unsafe_allow_html=True)
-        
-        # Tabel Statistik Deskriptif Detail
-        st.markdown('<div class="section-title">Tabel Ringkasan Statistik Parameter HVSR</div>', unsafe_allow_html=True)
-        desc_df = df[['f0', 'A0', 'Kg']].describe().T
-        desc_df = desc_df.rename(columns={'mean': 'Rata-rata', 'std': 'Deviasi Standar', 'min': 'Nilai Min', 'max': 'Nilai Maks', '50%': 'Median'})
-        st.dataframe(desc_df[['Rata-rata', 'Deviasi Standar', 'Nilai Min', 'Median', 'Nilai Maks']], use_container_width=True)
-        
-        # Visualisasi Grafik
-        st.markdown('<div class="section-title">Grafik Distribusi Parameter</div>', unsafe_allow_html=True)
-        g_col1, g_col2 = st.columns(2)
-        with g_col1:
-            st.write("**Histogram Distribusi Jumlah Titik berdasarkan Nilai Kg**")
-            fig_hist = px.histogram(df, x="Kg", color="Tingkat Kerentanan", 
-                                    color_discrete_map={"Rendah": "green", "Menengah": "orange", "Tinggi": "red"},
-                                    labels={'Kg': 'Indeks Kerentanan Seismik (Kg)', 'count': 'Jumlah Titik (Count)'})
-            st.plotly_chart(fig_hist, use_container_width=True)
-        with g_col2:
-            st.write("**Scatter Plot Hubungan f0 vs A0 terhadap Nilai Kg**")
-            fig_scatter = px.scatter(df, x="f0", y="A0", color="Tingkat Kerentanan", size="Kg", hover_name="Titik",
-                                     color_discrete_map={"Rendah": "green", "Menengah": "orange", "Tinggi": "red"},
-                                     labels={'f0': 'Frekuensi Dominan f0 (Hz)', 'A0': 'Faktor Amplifikasi A0'})
-            st.plotly_chart(fig_scatter, use_container_width=True)
-
-        st.markdown("""
-        <div class="ref-box">
-        <b>Referensi Standar Ambang Batas Klasifikasi Kerentanan Seismik (Nakamura, 1997):</b><br>
-        • <b>Rendah (Kg < 3):</b> Tingkat deformasi tanah rendah, batuan penyusun cenderung kompak/keras.<br>
-        • <b>Menengah (3 ≤ Kg ≤ 6):</b> Tingkat deformasi tanah sedang, batuan penyusun berupa aluvium/sedimen sedang.<br>
-        • <b>Tinggi (Kg > 6):</b> Tingkat deformasi tanah tinggi, sangat rawan mengalami pelunakan/amplifikasi parah akibat gempa bumi.
-        </div>
-        """, unsafe_allow_html=True)
-        
-# ==========================================
-# MENU 4: MIKROZONASI (VERSI RELEIF 3D SOLID & RAPI)
-# ==========================================
-elif menu == "Mikrozonasi":
-    st.markdown('<div class="main-title">Peta Mikrozonasi Seismik Daerah Penelitian</div>', unsafe_allow_html=True)
-    df = st.session_state.df_data
-    if df is None:
-        st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
-    else:
-        # 1. PETA INTERAKTIF UTAMA (FOLIUM) WITH INTERACTIVE TOOLTIP & POPUP
-        st.markdown('<div class="section-title">Peta 1: Distribusi Spasial Titik Pengukuran & Lokasi Kerentanan</div>', unsafe_allow_html=True)
-        st.write("Peta di bawah ini menunjukkan posisi geografis riil stasiun perekaman mikrotremor beserta klasifikasi tingkat kerentanannya.")
-        
-        center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
-        
-        for _, row in df.iterrows():
-            tooltip_info = f"Stasiun: {row['Titik']} (Klik untuk detail)"
-            popup_html = f"""
-            <div style='font-family: Arial, sans-serif; font-size: 12px; width: 220px; line-height: 1.4;'>
-                <h4 style='margin:0 0 5px 0; color:#1E3A8A;'>Stasiun {row['Titik']}</h4>
-                <hr style='border:none; border-top:1px solid #CCC; margin:5px 0;'>
-                <b>Koordinat:</b> {row['Latitude']:.5f}, {row['Longitude']:.5f}<br>
-                <b>Frekuensi (f₀):</b> {row['f0']:.2f} Hz<br>
-                <b>Amplifikasi (A₀):</b> {row['A0']:.2f}<br>
-                <b>Nilai Kerentanan (K_g):</b> {row['Kg']:.2f}<br>
-                <b>Status Risiko:</b> <span style='color:{color_picker_kg(row['Tingkat Kerentanan'])}; font-weight:bold;'>{row['Tingkat Kerentanan']}</span><br>
-                <b>Karakteristik:</b> {row['Karakteristik Tanah']}
-            </div>
-            """
-            folium.CircleMarker(
-                location=[row['Latitude'], row['Longitude']], radius=9,
-                popup=folium.Popup(popup_html, max_width=250),
-                tooltip=tooltip_info,
-                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
-            ).add_to(m)
-        
-        st_folium(m, width=1100, height=450)
-        st.caption("💡 *Petunjuk Pengguna: Arahkan kursor ke lingkaran untuk melihat nama stasiun. Klik pada lingkaran untuk memunculkan jendela informasi parameter fisis lengkap.*")
-        
-        # INTERPOLASI DATA GRID (IDW) - MATRIKS KOORDINAT LINEAR UNTUK SURFACE
-        x, y = df['Longitude'].values, df['Latitude'].values
-        x_line = np.linspace(x.min() - 0.003, x.max() + 0.003, 100)
-        y_line = np.linspace(y.min() - 0.003, y.max() + 0.003, 100)
-        xi, yi = np.meshgrid(x_line, y_line)
-        
-        zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
-        zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
-        zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
-        
-        # MEMBUAT PILIHAN VIEW TABS AGAR RAPI DAN TIDAK MELEBAR
-        st.markdown('<div class="section-title">Peta 2: Kontur Interpolasi Parameter Seismik Mikrozonasi</div>', unsafe_allow_html=True)
-        tab_2d, tab_3d = st.tabs(["📊 Peta Kontur 2D (Standard)", "🌋 Model Permukaan 3D (Interaktif Solid)"])
-        
-        # --- VIEW KONTUR 2D ---
-        with tab_2d:
-            st.write("Berikut adalah hasil rekonstruksi penampang dua dimensi dari variasi nilai parameter lokal menggunakan algoritma pembobotan jarak (IDW):")
-            col_a, col_b, col_c = st.columns(3)
-            
-            with col_a:
-                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2A. Kontur Frekuensi Dominan (f₀)</h4>", unsafe_allow_html=True)
-                fig2_f0 = go.Figure(data=go.Contour(z=zi_f0, x=x_line, y=y_line, colorscale='Plasma', contours_coloring='heatmap'))
-                fig2_f0.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
-                st.plotly_chart(fig2_f0, use_container_width=True)
-                st.caption("➔ **Interpretasi:** Nilai f₀ rendah mencerminkan ketebalan lapisan sedimen permukaan lunak yang tebal (Zonasi Aluvium).")
-                
-            with col_b:
-                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2B. Kontur Faktor Amplifikasi (A₀)</h4>", unsafe_allow_html=True)
-                fig2_a0 = go.Figure(data=go.Contour(z=zi_a0, x=x_line, y=y_line, colorscale='Viridis', contours_coloring='heatmap'))
-                fig2_a0.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
-                st.plotly_chart(fig2_a0, use_container_width=True)
-                st.caption("➔ **Interpretasi:** Area kontur rapat bernilai tinggi menunjukkan batas zona kontras impedansi gelombang seismik tinggi.")
-                
-            with col_c:
-                st.markdown("<h4 style='text-align: center; color: #1E3A8A;'>2C. Kontur Kerentanan Seismik (Kg)</h4>", unsafe_allow_html=True)
-                fig2_kg = go.Figure(data=go.Contour(z=zi_kg, x=x_line, y=y_line, colorscale='Jet', contours_coloring='heatmap'))
-                fig2_kg.update_layout(xaxis_title="Longitude", yaxis_title="Latitude", margin=dict(l=40, r=20, t=20, b=40), height=350)
-                st.plotly_chart(fig2_kg, use_container_width=True)
-                st.caption("➔ **Interpretasi:** Daerah anomalus merah fisis-teoritis merupakan zona kritis rawan kerusakan gempa wilayah setempat.")
-
-        # --- VIEW SURFACE 3D SOLID (HIGH RELIEF) ---
-        with tab_3d:
-            st.write("Gunakan kursor mouse Anda (klik, tahan, dan geser) untuk memutar model elevasi parameter fisis secara tiga dimensi:")
-            col_3a, col_3b, col_3c = st.columns(3)
-            
-            # Pengaturan parameter pencahayaan dan bayangan bukit agar padat dan bertekstur
-            high_relief_lighting = dict(
-                ambient=0.6,
-                diffuse=0.8,
-                fresnel=0.2,
-                specular=0.5,
-                roughness=0.1
-            )
-            
-            with col_3a:
-                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3A. Surface 3D Frekuensi (f₀)</h4>", unsafe_allow_html=True)
-                fig3_f0 = go.Figure(data=[go.Surface(
-                    z=zi_f0, x=x_line, y=y_line,
-                    colorscale='Plasma',
-                    lighting=high_relief_lighting,
-                    contours_z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project_z=True)
-                )])
-                fig3_f0.update_layout(
-                    scene=dict(
-                        xaxis_title='Longitude', yaxis_title='Latitude', zaxis_title='f0 (Hz)',
-                        aspectratio=dict(x=1, y=1, z=0.6) # Efek vertical exaggeration (penonjolan relief)
-                    ),
-                    margin=dict(l=0, r=0, b=10, t=10), height=450
-                )
-                st.plotly_chart(fig3_f0, use_container_width=True)
-                st.caption("Lembah curam ke bawah menandakan struktur cekungan sedimen purba.")
-                
-            with col_3b:
-                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3B. Surface 3D Amplifikasi (A₀)</h4>", unsafe_allow_html=True)
-                fig3_a0 = go.Figure(data=[go.Surface(
-                    z=zi_a0, x=x_line, y=y_line,
-                    colorscale='Viridis',
-                    lighting=high_relief_lighting,
-                    contours_z=dict(show=True, usecolormap=True, highlightcolor="limegreen", project_z=True)
-                )])
-                fig3_a0.update_layout(
-                    scene=dict(
-                        xaxis_title='Longitude', yaxis_title='Latitude', zaxis_title='A0',
-                        aspectratio=dict(x=1, y=1, z=0.6)
-                    ),
-                    margin=dict(l=0, r=0, b=10, t=10), height=450
-                )
-                st.plotly_chart(fig3_a0, use_container_width=True)
-                st.caption("Puncak bukit menunjukkan faktor perbesaran energi gelombang seismik lokal.")
-                
-            with col_3c:
-                st.markdown("<h4 style='text-align: center; color: #0D9488;'>3C. Surface 3D Kerentanan (Kg)</h4>", unsafe_allow_html=True)
-                fig3_kg = go.Figure(data=[go.Surface(
-                    z=zi_kg, x=x_line, y=y_line,
-                    colorscale='Jet',
-                    lighting=high_relief_lighting,
-                    contours_z=dict(show=True, usecolormap=True, highlightcolor="white", project_z=True)
-                )])
-                fig3_kg.update_layout(
-                    scene=dict(
-                        xaxis_title='Longitude', yaxis_title='Latitude', zaxis_title='Kg',
-                        aspectratio=dict(x=1, y=1, z=0.6)
-                    ),
-                    margin=dict(l=0, r=0, b=10, t=10), height=450
-                )
-                st.plotly_chart(fig3_kg, use_container_width=True)
-                st.caption("Tonjolan merah ekstrem wajib dihindari untuk perencanaan infrastruktur vital.")
-
-        # REFERENSI VALID ILMIAH JURNAL
-        st.markdown("""
-        <div class="ref-box">
-        <b>Pedoman Teoretis Klasifikasi Struktur Lapisan Tanah Berdasarkan Klas Kanai (1983) & SESAME (2004):</b><br>
-        1. <b>Batuan Keras / Hard Rock ($f_0 > 10$ Hz):</b> Tipe tanah Klas I. Aluvium sangat tipis terbentuk dari batuan Tersier. Aman dari risiko keruntuhan besar.<br>
-        2. <b>Tanah Padat / Sedimen Tipis ($4 \\le f_0 \\le 10$ Hz):</b> Tipe tanah Klas II. Lapisan berupa pasir padat, kerikil, atau endapan pengisi aluvium muda berketebalan tipis.<br>
-        3. <b>Sedimen Sedang ($1 \\le f_0 < 4$ Hz):</b> Tipe tanah Klas III. Karakteristik batuan penyusun berupa aluvium tua dengan ketebalan medium (banyak ditemukan di area pemukiman dataran).<br>
-        4. <b>Tanah Lunak / Sedimen Tebal ($f_0 < 1$ Hz):</b> Tipe tanah Klas IV. Lapisan tanah hasil endapan rawa, delta sungai, atau sedimen longgar berukuran tebal. Sangat rawan likuefaksi dan pergeseran tanah.
-        </div>
-        """, unsafe_allow_html=True)
-
-# ==========================================
-# MENU 5: ANALISIS RESONANSI (REVISI KLASIFIKASI VALID)
-# ==========================================
-elif menu == "Analisis Resonansi":
-    st.markdown('<div class="main-title">Analisis Risiko Resonansi Struktur Bangunan</div>', unsafe_allow_html=True)
-    df = st.session_state.df_data
-    if df is None:
-        st.warning("Silakan upload data CSV terlebih dahulu.")
-    else:
-        st.markdown("""
-        > ℹ️ **Catatan Keilmuan:** Penentuan nilai Frekuensi Alami Bangunan ($f_b$) di bawah ini merupakan bentuk **Estimasi Matematis** menggunakan rumus empiris standar *Building Seismic Safety Council* (BSSC). Sifatnya berfungsi sebagai indikasi awal kebencanaan (skrining awal) sebelum dilakukan pengujian langsung menggunakan instrumen akselerometer pada struktur bangunan gedung.
-        """)
-        
-        num_floors = st.number_input("Masukkan Jumlah Lantai Bangunan yang Akan Disimulasikan (N):", min_value=1, max_value=50, value=3)
-        fb = 10.0 / num_floors
-        st.markdown(f'<div class="metric-box"><b>Estimasi Frekuensi Alami Bangunan (fb):</b> <h2>{fb:.2f} Hz</h2></div>', unsafe_allow_html=True)
-        
-        def evaluate_resonance(f0, fb):
-            diff = abs(f0 - fb)
-            if diff <= 0.5: return "Risiko Tinggi (Bahaya)"
-            elif 0.5 < diff <= 1.5: return "Risiko Sedang (Waspada)"
-            return "Risiko Rendah (Aman)"
-            
-        df_res = df[['Titik', 'f0', 'A0']].copy()
-        df_res['fb (Freq Bangunan)'] = round(fb, 2)
-        df_res['Selisih |f0 - fb| (Hz)'] = round(abs(df_res['f0'] - fb), 2)
-        df_res['Status Risiko Resonansi'] = df_res['f0'].apply(lambda x: evaluate_resonance(x, fb))
-        
-        st.markdown('<div class="section-title">Tabel Hasil Perhitungan Skenario Resonansi Seismik</div>', unsafe_allow_html=True)
-        st.dataframe(df_res, use_container_width=True)
-        
-        st.markdown("""
-        <div class="ref-box">
-        <b>Referensi Kebencanaan Sipil-Geofisika (Standardisasi Matriks Risiko Resonansi):</b><br>
-        • <b>Risiko Tinggi (Selisih ≤ 0.5 Hz):</b> Frekuensi getaran tanah penutup berhimpit dengan frekuensi struktur gedung. Gedung terancam runtuh akibat amplifikasi ayunan resonansi ekstrem.<br>
-        • <b>Risiko Sedang (0.5 Hz < Selisih ≤ 1.5 Hz):</b> Efek getaran kopel terjadi namun tidak mencapai amplitudo destruktif maksimal.<br>
-        • <b>Risiko Rendah (Selisih > 1.5 Hz):</b> Aman. Struktur gedung aman dari fenomena resonansi karena perbedaan respons frekuensi getar yang kontras.
-        </div>
-        """, unsafe_allow_html=True)
+        with col3: st.markdown
