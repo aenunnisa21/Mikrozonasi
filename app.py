@@ -179,43 +179,6 @@ elif menu == "Analisis Kerentanan":
         </div>
         """, unsafe_allow_html=True)
 
-# ==========================================
-# MENU 4: MIKROZONASI (REVISI JUDUL & MULTI KONTUR & DESKRIPSI)
-# ==========================================
-elif menu == "Mikrozonasi":
-    st.markdown('<div class="main-title">Peta Mikrozonasi & Kontur Parameter Seismik</div>', unsafe_allow_html=True)
-    df = st.session_state.df_data
-    if df is None:
-        st.warning("Silakan upload data CSV terlebih dahulu.")
-    else:
-        # PETA KERENTANAN SEISMIK INTERAKTIF
-        st.markdown('<div class="section-title">Peta Kerentanan Seismik Interaktif (Folium)</div>', unsafe_allow_html=True)
-        center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=14)
-        
-        for _, row in df.iterrows():
-            # Membuat info detail saat kursor diarahkan / di-klik pada titik
-            tooltip_info = f"Titik: {row['Titik']}"
-            popup_html = f"""
-            <div style='font-family: Arial; font-size: 12px; width: 220px;'>
-                <b>Detail Informasi Titik {row['Titik']}</b><br><hr style='margin:5px 0;'>
-                <b>Koordinat:</b> {row['Latitude']:.5f}, {row['Longitude']:.5f}<br>
-                <b>Frekuensi ($f_0$):</b> {row['f0']:.2f} Hz<br>
-                <b>Amplifikasi ($A_0$):</b> {row['A0']:.2f}<br>
-                <b>Indeks Kerentanan ($K_g$):</b> {row['Kg']:.2f}<br>
-                <b>Status:</b> <span style='color:{color_picker_kg(row['Tingkat Kerentanan'])}; font-weight:bold;'>{row['Tingkat Kerentanan']}</span><br>
-                <b>Karakteristik Tanah:</b> {row['Karakteristik Tanah']}
-            </div>
-            """
-            folium.CircleMarker(
-                location=[row['Latitude'], row['Longitude']], radius=9,
-                popup=folium.Popup(popup_html, max_width=250),
-                tooltip=tooltip_info,
-                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
-            ).add_to(m)
-        
-        st_folium(m, width=1100, height=450)
-        st.caption("💡 *Arahkan kursor ke titik untuk melihat nama stasiun, klik pada titik untuk memunculkan ringkasan parameter geofisika lengkap.*")
         
 # ==========================================
 # MENU 4: MIKROZONASI (3 PETA BERJUDUL & RAPI)
