@@ -5,8 +5,11 @@ import plotly.graph_objects as go
 import folium
 from streamlit_folium import st_folium
 from scipy.spatial import distance_matrix
+
+# Mengaktifkan backend non-GUI (Agg) agar Matplotlib stabil di server cloud
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import io
 
 # ==========================================
@@ -62,19 +65,22 @@ def idw_interpolation(x, y, z, xi, yi, power=2):
     zi = np.dot(z, weights)
     return zi.reshape(xi.shape)
 
-# Helper untuk mengubah matriks kontur Matplotlib menjadi Gambar Overlay Folium
+# Helper untuk mengubah matriks kontur menjadi Gambar Overlay Folium (Surfer Style)
 def create_contour_overlay(xi, yi, zi, cmap_name):
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.position = [0, 0, 1, 1]
+    # Membuat kontur warna padat (Filled Contours)
     ax.contourf(xi, yi, zi, levels=15, cmap=cmap_name)
+    # Membuat garis kontur hitam halus beserta garis tegasnya
     ax.contour(xi, yi, zi, levels=15, colors='black', linewidths=0.5)
     ax.axis('off')
     
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=True, dpi=200)
     buf.seek(0)
+    img_data = plt.imread(buf)
     plt.close(fig)
-    return plt.imread(buf)
+    return img_data
 
 # Inisialisasi Session State Data
 if 'df_data' not in st.session_state:
@@ -100,13 +106,13 @@ with st.sidebar:
     st.caption("UAS Seismologi - © 2026")
 
 # ==========================================
-# 4. HEADER INTEGRASI HOME & INPUT DATA DIRECT
+# 4. HEADER UTAMA & UPLOAD DATA
 # ==========================================
 st.markdown('<div class="main-title">Aplikasi Mikrozonasi Seismik HVSR</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Program Studi Geofisika - UIN Sunan Kalijaga Yogyakarta</div>', unsafe_allow_html=True)
 
 if st.session_state.df_data is None:
-    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai pemetaan spasial dan analisis data.")
+    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai pemetaan spasial.")
 
 uploaded_file = st.file_uploader("Unggah File CSV Pengukuran Mikrotremor:", type=["csv"])
 
@@ -170,7 +176,7 @@ if menu == "Analisis Kerentanan":
             st.plotly_chart(fig_scatter, use_container_width=True)
 
 # ==========================================
-# MENU 2: MIKROZONASI SPASIAL (4 OUTPUT PETA SATELIT TERINTEGRASI)
+# MENU 2: MIKROZONASI SPASIAL (4 OUTPUT PETA SEKALIGUS)
 # ==========================================
 elif menu == "Mikrozonasi Spasial":
     if df is None:
@@ -178,14 +184,14 @@ elif menu == "Mikrozonasi Spasial":
     else:
         st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Overlay Kontur Surfer & Google Satellite)</div>', unsafe_allow_html=True)
         
-        # Geometri Dasar & Batas Koordinat Lapangan
+        # Batas Geometris Grid Koordinat
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
         pad = 0.003
         min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
         min_lon, max_lon = df['Longitude'].min() - pad, df['Longitude'].max() + pad
         bounds = [[min_lat, min_lon], [max_lat, max_lon]]
         
-        # Proses Gridding Interpolasi Spasial IDW
+        # Melakukan Gridding Interpolasi Spasial IDW
         x, y = df['Longitude'].values, df['Latitude'].values
         x_line = np.linspace(min_lon, max_lon, 150)
         y_line = np.linspace(min_lat, max_lat, 150)
@@ -195,12 +201,12 @@ elif menu == "Mikrozonasi Spasial":
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # Pembuatan Matriks Gambar Overlay Kontur bergaya Surfer
+        # Pembuatan Matriks Overlay Kontur
         img_a0 = create_contour_overlay(xi, yi, zi_a0, 'viridis')
         img_f0 = create_contour_overlay(xi, yi, zi_f0, 'plasma')
         img_kg = create_contour_overlay(xi, yi, zi_kg, 'jet')
         
-        # FUNGSI GENERATOR UTAMA PETA SATELLITE + OVERLAY KONTUR + INTERACTIVE POPUP
+        # Fungsi Utama Peta Satelit + Kontur + Interaktivitas Klik
         def generate_mikrozonasi_map(overlay_img=None):
             m = folium.Map(
                 location=[center_lat, center_lon], zoom_start=15,
@@ -208,27 +214,27 @@ elif menu == "Mikrozonasi Spasial":
                 attr='Google Satellite Imagery'
             )
             
-            # Pasang Gambar Kontur Berwarna Padat (Filled Contours) di atas Satelit jikalau parameter diisi
+            # Memasang Layer Kontur di Atas Satelit
             if overlay_img is not None:
                 folium.raster_layers.ImageOverlay(
                     image=overlay_img,
                     bounds=bounds,
-                    opacity=0.6,  # Transparansi agar peta dasar satelit bumi tetap terlihat di bawah kontur
+                    opacity=0.55,
                     mercator_project=True
                 ).add_to(m)
                 
-            # Pasang Marker Titik Pengukuran Lapangan dengan Fitur Interaktif Klik Laporan Detail
+            # Memasang Marker Stasiun beserta Popup Info jika diklik
             for _, row in df.iterrows():
                 popup_html = f"""
                 <div style='font-family: Arial, sans-serif; font-size: 12px; width: 180px;'>
                     <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Stasiun {row['Titik']}</b></h5>
-                    <b>Latitude:</b> {row['Latitude']:.5f}<br>
-                    <b>Longitude:</b> {row['Longitude']:.5f}<br>
+                    <b>Lat:</b> {row['Latitude']:.5f}<br>
+                    <b>Lon:</b> {row['Longitude']:.5f}<br>
                     <hr style='margin:5px 0;'>
-                    <span style='color:#0D9488;'><b>f₀ (Frekuensi):</b> {row['f0']:.2f} Hz</span><br>
-                    <span style='color:#EA580C;'><b>A₀ (Amplifikasi):</b> {row['A0']:.2f}</span><br>
+                    <span style='color:#0D9488;'><b>f₀:</b> {row['f0']:.2f} Hz</span><br>
+                    <span style='color:#EA580C;'><b>A₀:</b> {row['A0']:.2f}</span><br>
                     <span style='background-color:#FEF2F2; padding:2px 4px; border-radius:3px; display:inline-block; margin-top:3px;'>
-                        <b>K_g (Kerentanan):</b> <span style='color:#991B1B;'><b>{row['Kg']:.2f}</b></span>
+                        <b>K_g (Vulnerability):</b> <span style='color:#991B1B;'><b>{row['Kg']:.2f}</b></span>
                     </span>
                 </div>
                 """
@@ -240,7 +246,7 @@ elif menu == "Mikrozonasi Spasial":
                 ).add_to(m)
             return m
 
-        # TAB LAYOUTING UNTUK MENAMPILKAN 4 OUTPUT SEKALIGUS SECARA RAPI
+        # Pengelompokan 4 Output Menu Spasial Dalam Bentuk Tab Navigation yang Rapi
         tab1, tab2, tab3, tab4 = st.tabs([
             "📌 Peta 1: Peta Sebaran Stasiun", 
             "🟢 Peta 2: Kontur Amplifikasi (A₀)", 
@@ -249,28 +255,28 @@ elif menu == "Mikrozonasi Spasial":
         ])
         
         with tab1:
-            st.markdown("#### Peta 1: Lokasi Titik Pengukuran Geofisika Lapangan")
-            st.caption("💡 Klik lingkaran pin untuk memunculkan panel pop-up berisi nomor stasiun dan nilai indeks kerentanan ($K_g$) spesifik.")
+            st.markdown("#### Peta 1: Lokasi Titik Pengukuran Lapangan (Basemap Satelit)")
+            st.caption("💡 Klik lingkaran pin untuk memunculkan panel pop-up berisi nomor stasiun, koordinat, koordinat bujur/lintang, dan nilai Kg.")
             map_stasiun = generate_mikrozonasi_map(overlay_img=None)
-            st_folium(map_stasiun, width=1100, height=450, key="map_stasiun")
+            st_folium(map_stasiun, width=1100, height=450, key="map_stasiun_fixed")
             
         with tab2:
-            st.markdown("#### Peta 2: Kuantifikasi Faktor Amplifikasi Lapisan ($A_0$)")
-            st.caption("Model interpolasi warna padat (Filled Contour lines) menggunakan skala standar Matplotlib-Surfer `Viridis` Layer.")
+            st.markdown("#### Peta 2: Kontur Berwarna Faktor Amplifikasi Situs ($A_0$)")
+            st.caption("Model interpolasi warna padat (Filled Contour lines) menggunakan skala standar Surfer `Viridis` Layer.")
             map_a0 = generate_mikrozonasi_map(overlay_img=img_a0)
-            st_folium(map_a0, width=1100, height=450, key="map_a0")
+            st_folium(map_a0, width=1100, height=450, key="map_a0_fixed")
             
         with tab3:
-            st.markdown("#### Peta 3: Distribusi Nilai Frekuensi Alami Batuan Dasar ($f_0$)")
+            st.markdown("#### Peta 3: Kontur Distribusi Nilai Frekuensi Dominan Tanah ($f_0$)")
             st.caption("Model zonasi batuan keras hingga sedimen lunak bersumber dari hasil gridding penampang warna `Plasma` Layer.")
             map_f0 = generate_mikrozonasi_map(overlay_img=img_f0)
-            st_folium(map_f0, width=1100, height=450, key="map_f0")
+            st_folium(map_f0, width=1100, height=450, key="map_f0_fixed")
             
         with tab4:
-            st.markdown("#### Peta 4: Peta Zonasi Mikro Indeks Kerentanan Seismik ($K_g$)")
+            st.markdown("#### Peta 4: Peta Kontur Zonasi Mikro Indeks Kerentanan Seismik ($K_g$)")
             st.caption("Zona kritis anomali tinggi ditandai dengan warna merah pekat (`Jet Colormap`). Sangat vital sebagai acuan tata ruang konstruksi.")
             map_kg = generate_mikrozonasi_map(overlay_img=img_kg)
-            st_folium(map_kg, width=1100, height=450, key="map_kg")
+            st_folium(map_kg, width=1100, height=450, key="map_kg_fixed")
 
 # ==========================================
 # MENU 3: ANALISIS RESONANSI
