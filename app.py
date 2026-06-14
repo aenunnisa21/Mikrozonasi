@@ -64,7 +64,7 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# 3. SIDEBAR NAVIGATION & INTEGRATED UPLOAD
+# 3. SIDEBAR NAVIGATION
 # ==========================================
 with st.sidebar:
     try:
@@ -75,7 +75,6 @@ with st.sidebar:
     st.markdown("<h3 style='text-align: center; margin-top: 10px; color: #111827; font-size: 16px;'>GEOFISIKA UIN SUKA</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
-    # KONTROL MENU UTAMA (3 MENU BARU)
     menu = st.radio(
         "Pilih Menu Dashboard:",
         ["Analisis Kerentanan", "Mikrozonasi Spasial", "Analisis Resonansi"]
@@ -84,14 +83,13 @@ with st.sidebar:
     st.caption("UAS Seismologi - © 2026")
 
 # ==========================================
-# HEADER HALAMAN UTAMA & INPUT DATA DIRECT
+# 4. HEADER INTEGRASI HOME & INPUT DATA DIRECT
 # ==========================================
 st.markdown('<div class="main-title">Aplikasi Mikrozonasi Seismik HVSR</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Program Studi Geofisika - UIN Sunan Kalijaga Yogyakarta</div>', unsafe_allow_html=True)
 
-# Tempat upload ditaruh permanen di atas agar bisa diakses langsung saat pertama buka aplikasi
 if st.session_state.df_data is None:
-    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai analisis.")
+    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai pemetaan spasial dan analisis data.")
 
 uploaded_file = st.file_uploader("Unggah File CSV Pengukuran Mikrotremor:", type=["csv"])
 
@@ -107,7 +105,7 @@ if uploaded_file is not None:
                 df[c] = pd.to_numeric(df[c], errors='coerce')
             df = df.dropna(subset=['f0', 'A0', 'Latitude', 'Longitude'])
             
-            # Kalkulasi Parameter Geofisika
+            # Kalkulasi parameter geofisika dasar
             df['Kg'] = calculate_kg(df['A0'], df['f0'])
             df['Tingkat Kerentanan'] = df['Kg'].apply(classify_kg)
             df['Karakteristik Tanah'] = df['f0'].apply(classify_soil)
@@ -119,7 +117,7 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Gagal membaca file: {e}")
 
-# Proteksi apabila user membuka menu saat data belum terunggah
+# Membaca data aktif dari session state
 df = st.session_state.df_data
 
 # ==========================================
@@ -127,7 +125,7 @@ df = st.session_state.df_data
 # ==========================================
 if menu == "Analisis Kerentanan":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
         st.markdown('<div class="section-title">Ringkasan Statistik Parameter Struktur Lapisan</div>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
@@ -138,11 +136,9 @@ if menu == "Analisis Kerentanan":
         with col3: 
             st.markdown(f'<div class="metric-box"><b>Rata-rata Kg (Indeks Kerentanan)</b><h2>{df["Kg"].mean():.2f}</h2></div>', unsafe_allow_html=True)
         
-        # Tabel Data dan Deskripsi Detail
         st.write("")
         st.dataframe(df[['Titik', 'Longitude', 'Latitude', 'f0', 'A0', 'Kg', 'Tingkat Kerentanan', 'Karakteristik Tanah']], use_container_width=True)
         
-        # Grafik Distribusi Statistik
         g_col1, g_col2 = st.columns(2)
         with g_col1:
             st.write("**Histogram Distribusi Jumlah Titik berdasarkan Nilai Kg**")
@@ -153,7 +149,7 @@ if menu == "Analisis Kerentanan":
             st.write("**Scatter Plot Hubungan f0 vs A0 terhadap Nilai Kg**")
             fig_scatter = go.Figure(data=go.Scatter(
                 x=df["f0"], y=df["A0"], mode='markers', 
-                marker=dict(size=df["Kg"]*1.5, color=df["Kg"], colorscale='Jet showscale=True)
+                marker=dict(size=df["Kg"]*1.5, color=df["Kg"], colorscale='Jet', showscale=True)
             ))
             fig_scatter.update_layout(xaxis_title="Frekuensi Dominan f0 (Hz)", yaxis_title="Faktor Amplifikasi A0", height=320)
             st.plotly_chart(fig_scatter, use_container_width=True)
@@ -163,17 +159,16 @@ if menu == "Analisis Kerentanan":
 # ==========================================
 elif menu == "Mikrozonasi Spasial":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
-        # OUTPUT 1: PETA GIS 2D OVERLAY BASEMAP SATELIT
+        # PETA 1: GIS 2D OVERLAY BASEMAP SATELIT
         st.markdown('<div class="section-title">Peta 1: GIS 2D Sebaran Stasiun Ukur pada Basemap Satelit Bumi</div>', unsafe_allow_html=True)
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
         
-        # Menggunakan Tile Google Satellite asli agar visualnya realistik penampakan foto udara
         m = folium.Map(
             location=[center_lat, center_lon], zoom_start=15,
             tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            attr='Google Satellite Image'
+            attr='Google Satellite Imagery'
         )
         for _, row in df.iterrows():
             popup_html = f"<b>Stasiun {row['Titik']}</b><br>f₀: {row['f0']:.2f} Hz<br>A₀: {row['A0']:.2f}<br>K_g: {row['Kg']:.2f}"
@@ -204,7 +199,7 @@ elif menu == "Mikrozonasi Spasial":
         
         surfer_lighting = dict(ambient=0.55, diffuse=0.8, fresnel=0.2, specular=0.15, roughness=0.75)
         
-        # Pembuatan fungsi plot 3D dengan cetakan Kontur Berwarna Padat di lantai dasarnya (Filled Contours)
+        # Fungsi pembentuk plot 3D dengan cetakan Kontur Berwarna Padat di lantai dasarnya (Filled Contours)
         def create_surfer_plot(zi_data, colorscale_name, unit_lbl):
             fig = go.Figure(data=[go.Surface(
                 z=z_mountain, x=x_line, y=y_line, surfacecolor=zi_data,
@@ -230,33 +225,33 @@ elif menu == "Mikrozonasi Spasial":
             )
             return fig
 
-        # Render ke tiga tipe penampang peta 3D Surfer
+        # Render ketiga tipe penampang peta 3D Surfer (Peta 2, 3, dan 4)
         with col_3a:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>A. 3D Site Amplification Map (A₀)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>2A. 3D Site Amplification Map (A₀)</h4>", unsafe_allow_html=True)
             st.plotly_chart(create_surfer_plot(zi_a0, "Viridis", "Nilai A₀"), use_container_width=True)
         with col_3b:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>B. 3D Dominant Frequency Map (f₀)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>2B. 3D Dominant Frequency Map (f₀)</h4>", unsafe_allow_html=True)
             st.plotly_chart(create_surfer_plot(zi_f0, "Plasma", "f₀ (Hz)"), use_container_width=True)
         with col_3c:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>C. 3D Seismic Vulnerability Map (K_g)</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:14px;'>2C. 3D Seismic Vulnerability Map (K_g)</h4>", unsafe_allow_html=True)
             st.plotly_chart(create_surfer_plot(zi_kg, "Jet", "Nilai K_g"), use_container_width=True)
 
 # ==========================================
-# MENU 3: ANALISIS RESONANSI (DIRECT CALCULATION FROM FIELD CSV)
+# MENU 3: ANALISIS RESONANSI (TIAP BARIS DATA LAPANGAN)
 # ==========================================
 elif menu == "Analisis Resonansi":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
-        st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur Mikro Terhadap Bangunan</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur terhadap Bangunan Sekitar</div>', unsafe_allow_html=True)
         
-        # Form parameter input jumlah lantai bangunan simulasi
+        # Parameter input jumlah lantai bangunan target rencana konstruksi
         num_floors = st.number_input("Masukkan Jumlah Lantai Bangunan Target yang Disimulasikan (N):", min_value=1, max_value=40, value=3)
         
-        # Rumus Frekuensi Alami Bangunan (Berdasarkan Aturan Dasar Seismologi Teknik: fb = 10 / N)
+        # Rumus Frekuensi Alami Bangunan Utama (fb = 10 / N)
         fb = 10.0 / num_floors
         
-        st.markdown(f'<div class="metric-box"><b>Karakteristik Frekuensi Alami Bangunan Rencana (fb):</b> <h2>{fb:.2f} Hz (Untuk Bangunan {num_floors} Lantai)</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-box"><b>Karakteristik Frekuensi Alami Bangunan Rencana (fb):</b> <h2>{fb:.2f} Hz (Untuk Spesifikasi Bangunan Berlantai {num_floors})</h2></div>', unsafe_allow_html=True)
         
         # Fungsi evaluasi tingkat bahaya kerusakan struktur akibat resonansi gelombang
         def evaluate_resonance_risk(f0, fb):
@@ -267,16 +262,16 @@ elif menu == "Analisis Resonansi":
                 return "Risiko Sedang (Waspada)"
             return "Risiko Rendah (Aman)"
             
-        # PROSES PERHITUNGAN LANGSUNG MENGGUNAKAN NILAI f0 ASLI DARI TIAP BARIS CSV DATA LAPANGAN
+        # PROSES PERHITUNGAN LANGSUNG BERDASARKAN HASIL BARIS DATA LAPANGAN CSV
         df_res = df[['Titik', 'Longitude', 'Latitude', 'f0', 'A0']].copy()
         df_res['fb (Freq Bangunan)'] = round(fb, 2)
         df_res['Selisih |f0 - fb| (Hz)'] = round(abs(df_res['f0'] - fb), 2)
         df_res['Kondisi Kerentanan Bangunan'] = df_res.apply(lambda row: evaluate_resonance_risk(row['f0'], fb), axis=1)
         
         st.write("")
-        st.markdown("**Tabel Hasil Komparasi Parameter Frekuensi Dominan Tanah vs Bangunan:**")
+        st.markdown("**Tabel Hasil Komparasi Parameter Frekuensi Dominan Tanah vs Bangunan Sekitar:**")
         
-        # Pewarnaan baris otomatis pada tabel Streamlit untuk mempermudah identifikasi zona bahaya
+        # Fungsi penanda warna otomatis baris tabel Streamlit
         def color_rows(row):
             status = row['Kondisi Kerentanan Bangunan']
             if status == "Risiko Tinggi (Bahaya Resonansi)":
@@ -291,8 +286,8 @@ elif menu == "Analisis Resonansi":
         st.markdown("""
         <div class="ref-box">
         <b>Catatan Interpretasi Risiko Resonansi Struktur:</b><br>
-        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi alami tanah ($f_0$) dan bangunan ($f_b$) sangat dekat ($\leq 0.5$ Hz). Bangunan rentan mengalami guncangan berkali-kali lipat lebih hebat jika terjadi gempa bumi karena gelombang saling menguatkan.<br>
-        • <b>Risiko Sedang (Kuning):</b> Selisih frekuensi berada di rentang $0.5$ hingga $1.5$ Hz. Direkomendasikan melakukan perkuatan struktural pada kolom fondasi utama.<br>
-        • <b>Risiko Rendah (Hijau):</b> Selisih frekuensi $> 1.5$ Hz. Struktur aman dari bahaya amplifikasi resonansi lapisan mikro.
+        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi alami tanah ($f_0$) dan bangunan ($f_b$) sangat dekat ($\leq 0.5$ Hz). Bangunan rentan mengalami guncangan ganda ekstrem jika terjadi gempa bumi karena gelombang saling menguatkan.<br>
+        • <b>Risiko Sedang (Kuning):</b> Selisih frekuensi berada di rentang $0.5$ hingga $1.5$ Hz. Direkomendasikan melakukan perkuatan struktural atau rekayasa kekakuan kolom fondasi utama.<br>
+        • <b>Risiko Rendah (Hijau):</b> Selisih frekuensi $> 1.5$ Hz. Struktur aman dari bahaya amplifikasi kerusakan akibat getaran resonansi lapisan tanah lokal.
         </div>
         """, unsafe_allow_html=True)
