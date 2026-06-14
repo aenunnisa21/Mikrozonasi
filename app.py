@@ -253,25 +253,6 @@ elif menu == "Analisis Resonansi":
             unsafe_allow_html=True
         )
 
-        st.markdown("""
-        **Dasar Teori**
-
-        Analisis ini menggunakan pendekatan empiris periode alami bangunan:
-
-        T = 0.1N
-
-        dimana:
-        - T = periode alami bangunan (detik)
-        - N = jumlah lantai
-
-        Frekuensi alami bangunan dihitung dengan:
-
-        f_b = 1/T
-
-        Resonansi berpotensi terjadi ketika frekuensi dominan tanah (f₀)
-        mendekati frekuensi alami bangunan (f_b).
-        """)
-
         num_floors = st.number_input(
             "Masukkan Jumlah Lantai Bangunan (N):",
             min_value=1,
@@ -279,19 +260,23 @@ elif menu == "Analisis Resonansi":
             value=3
         )
 
-        # Periode dan frekuensi bangunan
+        # Estimasi frekuensi bangunan
         T = 0.1 * num_floors
         fb = 1 / T
 
         st.info(
-            f"Periode Bangunan (T) = {T:.2f} s | "
-            f"Frekuensi Alami Bangunan (f_b) = {fb:.2f} Hz"
+            f"Frekuensi Alami Bangunan Estimasi (f_b) = {fb:.2f} Hz"
         )
 
-        # Hitung rasio kedekatan frekuensi
-        df_res = df.copy()
+        st.caption(
+            "Estimasi menggunakan pendekatan empiris T ≈ 0,1N "
+            "(Paulay & Priestley, 1992; Chopra, 2017)"
+        )
 
-        df_res["f_b"] = fb
+        # Analisis resonansi
+        df_res = df.copy()
+        df_res["f_b"] = round(fb, 2)
+
         df_res["Rasio"] = abs(df_res["f0"] - fb) / fb
 
         def klasifikasi_resonansi(r):
@@ -311,5 +296,6 @@ elif menu == "Analisis Resonansi":
         st.dataframe(
             df_res[
                 ["Titik", "f0", "f_b", "Risiko Resonansi"]
-            ]
+            ],
+            use_container_width=True
         )
