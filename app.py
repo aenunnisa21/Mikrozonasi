@@ -177,7 +177,7 @@ elif menu == "Mikrozonasi Spasial":
             m = folium.Map(
                 location=[center_lat, center_lon], zoom_start=16,
                 tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-                attr='Google Satellite Imagery'
+                attr='Google Satellite Imagery',
                 control_scale=True  # ⚡ BARIS INI YANG MENAMBAHKAN SCALE BAR OTOMATIS (Meter / Miles)
             )
             
