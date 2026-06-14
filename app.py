@@ -1,12 +1,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 import folium
 from streamlit_folium import st_folium
 from scipy.spatial import distance_matrix
+
+# Memastikan Matplotlib berjalan stabil tanpa GUI di server cloud (Wajib di atas)
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import io
-from PIL import Image
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN & CSS DASHBOARD
@@ -59,30 +62,32 @@ def idw_interpolation(x, y, z, xi, yi, power=2):
     zi = np.dot(z, weights)
     return zi.reshape(xi.shape)
 
-# REPLIKA ENGINE SURFER: Menggunakan Plotly untuk Menghindari Crash Server & Menghilangkan Sumbu/Aksis Putih
-def create_surfer_contour_overlay(xi, yi, zi, colorscale_name):
-    fig = go.Figure(data=go.Contour(
-        z=zi,
-        x=xi[0, :],
-        y=yi[:, 0],
-        colorscale=colorscale_name,
-        showscale=False,
-        line=dict(color='black', width=0.5), # Garis batas kontur penegas wilayah (Surfer Style)
-        contours=dict(coloring='fill')
-    ))
+# REPLIKA ENGINE SURFER & QGIS: Menggunakan Matplotlib yang Dibersihkan Ketat Bebas Crash
+def create_surfer_contour_overlay(xi, yi, zi, cmap_name, levels=15):
+    # Membuat objek figure secara eksplisit agar bisa dihancurkan dari memori setelah selesai
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=200, frameon=False)
+    fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    ax.axis('off')  # Mematikan total aksis koordinat pembatas
     
-    fig.update_layout(
-        xaxis=dict(visible=False, showgrid=False, zeroline=False),
-        yaxis=dict(visible=False, showgrid=False, zeroline=False),
-        margin=dict(l=0, r=0, t=0, b=0),
-        width=800,
-        height=800
-    )
+    # 1. Filled Contours (Gradasi Warna Padat Gaya Surfer)
+    ax.contourf(xi, yi, zi, levels=levels, cmap=cmap_name)
     
-    # Konversi plot langsung menjadi raw bytes gambar PNG Transparan murni
-    img_bytes = fig.to_image(format="png")
-    img = Image.open(io.BytesIO(img_bytes))
-    return img
+    # 2. Contour Lines (Garis kontur penegas anomali)
+    ax.contour(xi, yi, zi, levels=levels, colors='black', linewidths=0.4, alpha=0.6)
+    
+    # Simpan plot ke penyangga memori byte
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=True)
+    buf.seek(0)
+    
+    # Membaca kembali data gambar untuk Folium layer
+    img_data = plt.imread(buf)
+    
+    # KUNCI UTAMA: Hancurkan objek visual dari memori agar backend 'Agg' tidak crash / overload
+    plt.close(fig)
+    buf.close()
+    
+    return img_data
 
 # Inisialisasi Session State Data
 if 'df_data' not in st.session_state:
@@ -151,7 +156,7 @@ elif menu == "Mikrozonasi Spasial":
         
         # Penentuan batas koordinat area secara ketat di area pengukuran
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        pad = 0.002  # Ukuran kotak pembatas area zonasi agar pas dengan sebaran data
+        pad = 0.002  
         min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
         min_lon, max_lon = df['Longitude'].min() - pad, df['Longitude'].max() + pad
         bounds = [[min_lat, min_lon], [max_lat, max_lon]]
@@ -166,14 +171,14 @@ elif menu == "Mikrozonasi Spasial":
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # Pembuatan Gambar Raster Kontur Padat Murni Bersih (Menggunakan Nama Skema Plotly yang Sesuai)
-        img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'Rainbow')
-        img_f0 = create_surfer_contour_overlay(xi, yi, zi_f0, 'Viridis')
-        img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'Jet')
+        # Pembuatan Gambar Raster Kontur Padat Murni Bersih (Menggunakan Matplotlib)
+        img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'rainbow') 
+        img_f0 = create_surfer_contour_overlay(xi, yi, zi_f0, 'viridis')
+        img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'jet')     
         
         # --- FUNGSI UTAMA GENERATOR INTERAKTIF FOLIUM ---
         def generate_mikrozonasi_map(overlay_img=None, is_peta_1=False):
-            # Inisialisasi basemap murni Google Satellite + Mengaktifkan Scale Bar otomatis di pojok kiri bawah
+            # Inisialisasi basemap murni Google Satellite + Mengaktifkan Scale Bar otomatis
             m = folium.Map(
                 location=[center_lat, center_lon], zoom_start=16,
                 tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
@@ -181,16 +186,16 @@ elif menu == "Mikrozonasi Spasial":
                 control_scale=True  
             )
             
-            # Jika Peta 2, 3, atau 4 (overlay_img diisi), tempelkan raster konturnya ke peta
+            # Tempelkan raster kontur jika parameter diisi (Untuk Peta 2, 3, dan 4)
             if overlay_img is not None:
                 folium.raster_layers.ImageOverlay(
                     image=overlay_img,
                     bounds=bounds,
-                    opacity=0.60,  # Nilai transparansi rona satelit di bawah kontur
+                    opacity=0.60,  
                     mercator_project=True
                 ).add_to(m)
             
-            # Modifikasi agar titik lingkaran HANYA muncul di Peta 1
+            # Logika Fix: Titik sirkular HANYA berputar dan digambar jika merupakan Peta 1
             if is_peta_1:
                 for _, row in df.iterrows():
                     popup_html = f"""
@@ -220,22 +225,22 @@ elif menu == "Mikrozonasi Spasial":
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
             st.caption("💡 Petunjuk: Klik pada bulatan titik stasiun untuk memeriksa data letak posisi geografisnya (Titik ke-n beserta koordinat Lintang/Bujurnya).")
-            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_koordinat")
+            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_final_rev")
             
         with tab2:
             st.markdown("#### Peta 2: Visualisasi Kontur Padat Faktor Amplifikasi Situs ($A_0$)")
             st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
-            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_a0_clean")
+            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_final_rev")
             
         with tab3:
             st.markdown("#### Peta 3: Visualisasi Kontur Padat Frekuensi Dominan Tanah ($f_0$)")
             st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
-            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_f0_clean")
+            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_final_rev")
             
         with tab4:
             st.markdown("#### Peta 4: Visualisasi Kontur Padat Indeks Kerentanan Seismik ($K_g$)")
             st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
-            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_kg_clean")
+            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_final_rev")
             
 elif menu == "Analisis Resonansi":
     if df is None:
