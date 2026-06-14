@@ -5,7 +5,7 @@ import folium
 from streamlit_folium import st_folium
 from scipy.spatial import distance_matrix
 
-# Memastikan Matplotlib berjalan stabil tanpa GUI di server cloud (Wajib di atas)
+# Memastikan Matplotlib berjalan stabil tanpa GUI di server cloud
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -41,11 +41,20 @@ def classify_kg(kg):
     elif 3 <= kg <= 6: return "Menengah"
     else: return "Tinggi"
 
-def classify_soil(f0):
-    if f0 > 10: return "Klas I (Batuan Keras)"
-    elif 4 <= f0 <= 10: return "Klas II (Tanah Padat)"
-    elif 1 <= f0 < 4: return "Klas III (Sedimen Sedang)"
-    else: return "Klas IV (Sedimen Lunak)"
+# Klasifikasi Amplifikasi Situs (A0) Berdasarkan Jurnal Referensi (Table 2)
+def classify_amplification(a0):
+    if a0 < 3: return "Low"
+    elif 3 <= a0 < 6: return "Moderate"
+    elif 6 <= a0 < 9: return "High"
+    else: return "Very High"
+
+# Klasifikasi Karakteristik Tanah (f0) Berdasarkan Kanai Classification (Table 1)
+def classify_soil_kanai(f0):
+    if 6.7 <= f0 <= 20: return "Klas I (Tertiary/Older Rock - Hard)"
+    elif 4 <= f0 < 6.7: return "Klas II (Alluvial 5m - Moderate/Hard)"
+    elif 2.5 <= f0 < 4: return "Klas III (Alluvial >5m - Medium Sediment)"
+    elif f0 < 2.5: return "Klas IV (Alluvial Delta - Very Thick/Soft)"
+    else: return "Di luar Rentang Standar Kanai (>20 Hz)"
 
 def color_picker_kg(status):
     if status == "Rendah": return "green"
@@ -62,31 +71,25 @@ def idw_interpolation(x, y, z, xi, yi, power=2):
     zi = np.dot(z, weights)
     return zi.reshape(xi.shape)
 
-# REPLIKA ENGINE SURFER & QGIS: Menggunakan Matplotlib yang Dibersihkan Ketat Bebas Crash
+# REPLIKA ENGINE SURFER & QGIS CONTORING (Matplotlib Clean Buffer Memory)
 def create_surfer_contour_overlay(xi, yi, zi, cmap_name, levels=15):
-    # Membuat objek figure secara eksplisit agar bisa dihancurkan dari memori setelah selesai
     fig, ax = plt.subplots(figsize=(10, 10), dpi=200, frameon=False)
     fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    ax.axis('off')  # Mematikan total aksis koordinat pembatas
+    ax.axis('off') 
     
-    # 1. Filled Contours (Gradasi Warna Padat Gaya Surfer)
+    # 1. Filled Contours
     ax.contourf(xi, yi, zi, levels=levels, cmap=cmap_name)
     
-    # 2. Contour Lines (Garis kontur penegas anomali)
+    # 2. Contour Lines (Garis kontur penegas batas anomali wilayah)
     ax.contour(xi, yi, zi, levels=levels, colors='black', linewidths=0.4, alpha=0.6)
     
-    # Simpan plot ke penyangga memori byte
     buf = io.BytesIO()
     fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=True)
     buf.seek(0)
-    
-    # Membaca kembali data gambar untuk Folium layer
     img_data = plt.imread(buf)
     
-    # KUNCI UTAMA: Hancurkan objek visual dari memori agar backend 'Agg' tidak crash / overload
     plt.close(fig)
     buf.close()
-    
     return img_data
 
 # Inisialisasi Session State Data
@@ -126,7 +129,8 @@ if uploaded_file is not None:
             
             df['Kg'] = calculate_kg(df['A0'], df['f0'])
             df['Tingkat Kerentanan'] = df['Kg'].apply(classify_kg)
-            df['Karakteristik Tanah'] = df['f0'].apply(classify_soil)
+            df['Klasifikasi Klas Tanah (Kanai)'] = df['f0'].apply(classify_soil_kanai)
+            df['Klasifikasi Amplifikasi Situs'] = df['A0'].apply(classify_amplification)
             st.session_state.df_data = df
     except Exception as e:
         st.error(f"Gagal memproses file: {e}")
@@ -146,7 +150,7 @@ if menu == "Analisis Kerentanan":
         col2.markdown(f'<div class="metric-box"><b>Rata-rata A0</b><h2>{df["A0"].mean():.2f}</h2></div>', unsafe_allow_html=True)
         col3.markdown(f'<div class="metric-box"><b>Rata-rata Kg</b><h2>{df["Kg"].mean():.2f}</h2></div>', unsafe_allow_html=True)
         st.write("")
-        st.dataframe(df[['Titik', 'Longitude', 'Latitude', 'f0', 'A0', 'Kg', 'Tingkat Kerentanan', 'Karakteristik Tanah']], use_container_width=True)
+        st.dataframe(df[['Titik', 'Longitude', 'Latitude', 'f0', 'Klasifikasi Klas Tanah (Kanai)', 'A0', 'Klasifikasi Amplifikasi Situs', 'Kg', 'Tingkat Kerentanan']], use_container_width=True)
 
 elif menu == "Mikrozonasi Spasial":
     if df is None:
@@ -154,7 +158,6 @@ elif menu == "Mikrozonasi Spasial":
     else:
         st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Google Satellite)</div>', unsafe_allow_html=True)
         
-        # Penentuan batas koordinat area secara ketat di area pengukuran
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
         pad = 0.002  
         min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
@@ -171,14 +174,13 @@ elif menu == "Mikrozonasi Spasial":
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # Pembuatan Gambar Raster Kontur Padat Murni Bersih (Menggunakan Matplotlib)
+        # Pembuatan Gambar Raster Kontur Padat Murni Bersih
         img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'rainbow') 
         img_f0 = create_surfer_contour_overlay(xi, yi, zi_f0, 'viridis')
         img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'jet')     
         
         # --- FUNGSI UTAMA GENERATOR INTERAKTIF FOLIUM ---
         def generate_mikrozonasi_map(overlay_img=None, is_peta_1=False):
-            # Inisialisasi basemap murni Google Satellite + Mengaktifkan Scale Bar otomatis
             m = folium.Map(
                 location=[center_lat, center_lon], zoom_start=16,
                 tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
@@ -186,7 +188,6 @@ elif menu == "Mikrozonasi Spasial":
                 control_scale=True  
             )
             
-            # Tempelkan raster kontur jika parameter diisi (Untuk Peta 2, 3, dan 4)
             if overlay_img is not None:
                 folium.raster_layers.ImageOverlay(
                     image=overlay_img,
@@ -195,19 +196,20 @@ elif menu == "Mikrozonasi Spasial":
                     mercator_project=True
                 ).add_to(m)
             
-            # Logika Fix: Titik sirkular HANYA berputar dan digambar jika merupakan Peta 1
             if is_peta_1:
                 for _, row in df.iterrows():
                     popup_html = f"""
-                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 140px;'>
+                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 160px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
-                        <b>Latitude:</b> {row['Latitude']:.5f}<br>
-                        <b>Longitude:</b> {row['Longitude']:.5f}
+                        <b>f0:</b> {row['f0']:.2f} Hz<br>
+                        <b>A0:</b> {row['A0']:.2f}<br>
+                        <b>Kg:</b> {row['Kg']:.2f}<br>
+                        <b>Tanah:</b> {row['Klasifikasi Klas Tanah (Kanai)'].split(' ')[0]}
                     </div>
                     """
                     folium.CircleMarker(
                         location=[row['Latitude'], row['Longitude']], radius=5,
-                        popup=folium.Popup(popup_html, max_width=180),
+                        popup=folium.Popup(popup_html, max_width=200),
                         color='black', weight=1.2,
                         fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
                     ).add_to(m)
@@ -224,17 +226,17 @@ elif menu == "Mikrozonasi Spasial":
         
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
-            st.caption("💡 Petunjuk: Klik pada bulatan titik stasiun untuk memeriksa data letak posisi geografisnya (Titik ke-n beserta koordinat Lintang/Bujurnya).")
+            st.caption("💡 Petunjuk: Klik pada bulatan titik stasiun untuk memeriksa data letak posisi geografisnya.")
             st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_final_rev")
             
         with tab2:
             st.markdown("#### Peta 2: Visualisasi Kontur Padat Faktor Amplifikasi Situs ($A_0$)")
-            st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
+            st.caption("✨ Klasifikasi rujukan berdasarkan nilai impedansi batuan (Low < 3 s.d Very High >= 9).")
             st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_final_rev")
             
         with tab3:
             st.markdown("#### Peta 3: Visualisasi Kontur Padat Frekuensi Dominan Tanah ($f_0$)")
-            st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
+            st.caption("✨ Mengadopsi Klasifikasi Standar Efek Ketebalan Sedimen Kanai (1957).")
             st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_final_rev")
             
         with tab4:
