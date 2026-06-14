@@ -7,7 +7,7 @@ from streamlit_folium import st_folium
 from scipy.spatial import distance_matrix
 
 # ==========================================
-# KONFIGURASI HALAMAN UTAMA
+# 1. KONFIGURASI HALAMAN UTAMA & LAYOUT
 # ==========================================
 st.set_page_config(
     page_title="Mikrozonasi Seismik HVSR - UIN Sunan Kalijaga",
@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk layout dashboard Geofisika
+# Custom CSS untuk standardisasi tampilan Dashboard Geofisika
 st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; margin-bottom: 20px; }
@@ -27,7 +27,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# FUNGSI GEOFISIKA & INTERPOLASI
+# 2. FUNGSI GEOFISIKA & INTERPOLASI SPASIAL
 # ==========================================
 def calculate_kg(a0, f0):
     return (a0 ** 2) / f0
@@ -58,11 +58,12 @@ def idw_interpolation(x, y, z, xi, yi, power=2):
     zi = np.dot(z, weights)
     return zi.reshape(xi.shape)
 
+# Inisialisasi session state agar data awet saat pindah menu
 if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# SIDEBAR NAVIGATION
+# 3. SIDEBAR NAVIGATION
 # ==========================================
 with st.sidebar:
     try:
@@ -111,4 +112,82 @@ elif menu == "Upload Data":
                     df[c] = pd.to_numeric(df[c], errors='coerce')
                 df = df.dropna(subset=['f0', 'A0', 'Latitude', 'Longitude'])
                 
-                df['Kg'] = calculate_kg(df['A0'], df
+                df['Kg'] = calculate_kg(df['A0'], df['f0'])
+                df['Tingkat Kerentanan'] = df['Kg'].apply(classify_kg)
+                df['Karakteristik Tanah'] = df['f0'].apply(classify_soil)
+                
+                st.session_state.df_data = df
+                st.success("Data berhasil diunggah!")
+                st.dataframe(df, use_container_width=True)
+            else:
+                st.error("Format salah. Pastikan kolom berisi: TITIK, LONGITUDE, LATITUDE, F0, A0")
+        except Exception as e:
+            st.error(f"Error: {e}")
+    elif st.session_state.df_data is not None:
+        st.dataframe(st.session_state.df_data, use_container_width=True)
+
+# ==========================================
+# MENU 3: ANALISIS KERENTANAN
+# ==========================================
+elif menu == "Analisis Kerentanan":
+    st.markdown('<div class="main-title">Analisis Kerentanan Seismik & Statistik Detail</div>', unsafe_allow_html=True)
+    df = st.session_state.df_data
+    if df is None:
+        st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
+    else:
+        col1, col2, col3 = st.columns(3)
+        with col1: 
+            st.markdown(f'<div class="metric-box"><b>Rata-rata f0 (Frekuensi Dominan)</b><h2>{df["f0"].mean():.2f} Hz</h2></div>', unsafe_allow_html=True)
+        with col2: 
+            st.markdown(f'<div class="metric-box"><b>Rata-rata A0 (Amplifikasi)</b><h2>{df["A0"].mean():.2f}</h2></div>', unsafe_allow_html=True)
+        with col3: 
+            st.markdown(f'<div class="metric-box"><b>Rata-rata Kg (Indeks Kerentanan)</b><h2>{df["Kg"].mean():.2f}</h2></div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="section-title">Tabel Ringkasan Statistik Parameter HVSR</div>', unsafe_allow_html=True)
+        desc_df = df[['f0', 'A0', 'Kg']].describe().T
+        desc_df = desc_df.rename(columns={'mean': 'Rata-rata', 'std': 'Deviasi Standar', 'min': 'Nilai Min', 'max': 'Nilai Maks', '50%': 'Median'})
+        st.dataframe(desc_df[['Rata-rata', 'Deviasi Standar', 'Nilai Min', 'Median', 'Nilai Maks']], use_container_width=True)
+        
+        g_col1, g_col2 = st.columns(2)
+        with g_col1:
+            st.write("**Histogram Distribusi Jumlah Titik berdasarkan Nilai Kg**")
+            fig_hist = go.Figure(data=[go.Histogram(x=df["Kg"], marker_color='#0D9488')])
+            fig_hist.update_layout(xaxis_title="Indeks Kerentanan Seismik (Kg)", yaxis_title="Jumlah Titik", height=350)
+            st.plotly_chart(fig_hist, use_container_width=True)
+        with g_col2:
+            st.write("**Scatter Plot Hubungan f0 vs A0 terhadap Nilai Kg**")
+            fig_scatter = go.Figure(data=go.Scatter(
+                x=df["f0"], y=df["A0"], mode='markers', 
+                marker=dict(size=df["Kg"]*1.5, color=df["Kg"], colorscale='Jet', showscale=True)
+            ))
+            fig_scatter.update_layout(xaxis_title="Frekuensi Dominan f0 (Hz)", yaxis_title="Faktor Amplifikasi A0", height=350)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+# ==========================================
+# MENU 4: MIKROZONASI (SURFER 3D REPLICA WITH FILLED COLOR CONTOURS)
+# ==========================================
+elif menu == "Mikrozonasi":
+    st.markdown('<div class="main-title">Peta Kerentanan Seismik & Model Spasial 3D</div>', unsafe_allow_html=True)
+    df = st.session_state.df_data
+    if df is None:
+        st.warning("Silakan upload data CSV terlebih dahulu di menu Upload Data.")
+    else:
+        # 1. PETA GIS MAPBOX RELEIF TERRAIN BUMI
+        st.markdown('<div class="section-title">Peta 1: GIS Overlay Parameter Seismik pada Basemap Terrain Bumi</div>', unsafe_allow_html=True)
+        center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
+        
+        m = folium.Map(
+            location=[center_lat, center_lon], zoom_start=14,
+            tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            attr='&copy; OpenTopoMap'
+        )
+        for _, row in df.iterrows():
+            popup_html = f"<b>Stasiun {row['Titik']}</b><br>f₀: {row['f0']:.2f} Hz<br>A₀: {row['A0']:.2f}<br>K_g: {row['Kg']:.2f}"
+            folium.CircleMarker(
+                location=[row['Latitude'], row['Longitude']], radius=9,
+                popup=folium.Popup(popup_html, max_width=200),
+                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.85
+            ).add_to(m)
+        st_folium(m, width=1100, height=350)
+        
+        #
