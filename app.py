@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 import folium
 from streamlit_folium import st_folium
 from scipy.spatial import distance_matrix
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import io
 
 # ==========================================
 # 1. KONFIGURASI HALAMAN UTAMA & LAYOUT
@@ -16,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk standardisasi Dashboard Geofisika UIN
+# Kustomisasi CSS Dashboard Geofisika UIN
 st.markdown("""
     <style>
     .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; margin-bottom: 5px; }
@@ -28,7 +31,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. GEOFISIKA & INTERPOLASI SPASIAL (IDW)
+# 2. FUNGSI GEOFISIKA & INTERPOLASI SPASIAL
 # ==========================================
 def calculate_kg(a0, f0):
     return (a0 ** 2) / f0
@@ -59,7 +62,21 @@ def idw_interpolation(x, y, z, xi, yi, power=2):
     zi = np.dot(z, weights)
     return zi.reshape(xi.shape)
 
-# Inisialisasi Session State Data CSV
+# Helper untuk mengubah matriks kontur Matplotlib menjadi Gambar Overlay Folium
+def create_contour_overlay(xi, yi, zi, cmap_name):
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.position = [0, 0, 1, 1]
+    ax.contourf(xi, yi, zi, levels=15, cmap=cmap_name)
+    ax.contour(xi, yi, zi, levels=15, colors='black', linewidths=0.5)
+    ax.axis('off')
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=True, dpi=200)
+    buf.seek(0)
+    plt.close(fig)
+    return plt.imread(buf)
+
+# Inisialisasi Session State Data
 if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
@@ -83,13 +100,13 @@ with st.sidebar:
     st.caption("UAS Seismologi - © 2026")
 
 # ==========================================
-# 4. HEADER UTAMA & UPLOAD DATA DIRECT (HOME)
+# 4. HEADER INTEGRASI HOME & INPUT DATA DIRECT
 # ==========================================
 st.markdown('<div class="main-title">Aplikasi Mikrozonasi Seismik HVSR</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Program Studi Geofisika - UIN Sunan Kalijaga Yogyakarta</div>', unsafe_allow_html=True)
 
 if st.session_state.df_data is None:
-    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai pemetaan kontur Surfer.")
+    st.info("👋 Selamat Datang! Silakan unggah file CSV hasil pengukuran lapangan Anda di bawah ini untuk memulai pemetaan spasial dan analisis data.")
 
 uploaded_file = st.file_uploader("Unggah File CSV Pengukuran Mikrotremor:", type=["csv"])
 
@@ -105,7 +122,6 @@ if uploaded_file is not None:
                 df[c] = pd.to_numeric(df[c], errors='coerce')
             df = df.dropna(subset=['f0', 'A0', 'Latitude', 'Longitude'])
             
-            # Kalkulasi parameter geofisika
             df['Kg'] = calculate_kg(df['A0'], df['f0'])
             df['Tingkat Kerentanan'] = df['Kg'].apply(classify_kg)
             df['Karakteristik Tanah'] = df['f0'].apply(classify_soil)
@@ -124,7 +140,7 @@ df = st.session_state.df_data
 # ==========================================
 if menu == "Analisis Kerentanan":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
         st.markdown('<div class="section-title">Ringkasan Statistik Parameter Struktur Lapisan</div>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
@@ -148,126 +164,127 @@ if menu == "Analisis Kerentanan":
             st.write("**Scatter Plot Hubungan f0 vs A0 terhadap Nilai Kg**")
             fig_scatter = go.Figure(data=go.Scatter(
                 x=df["f0"], y=df["A0"], mode='markers', 
-                marker=dict(size=df["Kg"]*1.5, color=df["Kg"], colorscale='Jet', showscale=True)
+                marker=dict(size=df["Kg"]*2.0, color=df["Kg"], colorscale='jet', showscale=True)
             ))
             fig_scatter.update_layout(xaxis_title="Frekuensi Dominan f0 (Hz)", yaxis_title="Faktor Amplifikasi A0", height=320)
             st.plotly_chart(fig_scatter, use_container_width=True)
 
 # ==========================================
-# MENU 2: MIKROZONASI SPASIAL (4 OUTPUT MAPS DENGAN REPLIKA KONTUR SURFER)
+# MENU 2: MIKROZONASI SPASIAL (4 OUTPUT PETA SATELIT TERINTEGRASI)
 # ==========================================
 elif menu == "Mikrozonasi Spasial":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
-        # PETA 1: PETA SEBARAN STASIUN UNTUK KERENTANAN SEISMIK
-        st.markdown('<div class="section-title">Peta 1: GIS Sebaran Stasiun Ukur (Overlay Satelit & Popup Info)</div>', unsafe_allow_html=True)
-        st.write("💡 *Klik pada marker lingkaran untuk melihat nomor titik, koordinat geografis, serta nilai Indeks Kerentanan Seismik (Kg).*")
+        st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Overlay Kontur Surfer & Google Satellite)</div>', unsafe_allow_html=True)
         
+        # Geometri Dasar & Batas Koordinat Lapangan
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        m = folium.Map(
-            location=[center_lat, center_lon], zoom_start=15,
-            tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            attr='Google Satellite Imagery'
-        )
+        pad = 0.003
+        min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
+        min_lon, max_lon = df['Longitude'].min() - pad, df['Longitude'].max() + pad
+        bounds = [[min_lat, min_lon], [max_lat, max_lon]]
         
-        for _, row in df.iterrows():
-            popup_html = f"""
-            <div style='font-family: Arial, sans-serif; font-size: 13px;'>
-                <h4 style='margin:0 0 5px 0; color:#1E3A8A;'>Stasiun {row['Titik']}</h4>
-                <b>Latitude:</b> {row['Latitude']:.5f}<br>
-                <b>Longitude:</b> {row['Longitude']:.5f}<br><br>
-                <span style='color:#0D9488;'><b>f₀:</b> {row['f0']:.2f} Hz</span><br>
-                <span style='color:#EA580C;'><b>A₀:</b> {row['A0']:.2f}</span><br>
-                <span style='background-color:#FEF2F2; padding:2px 5px; border-radius:3px;'><b>K_g:</b> {row['Kg']:.2f} ({row['Tingkat Kerentanan']})</span>
-            </div>
-            """
-            folium.CircleMarker(
-                location=[row['Latitude'], row['Longitude']], radius=9,
-                popup=folium.Popup(popup_html, max_width=250),
-                color=color_picker_kg(row['Tingkat Kerentanan']), fill=True, fill_opacity=0.95
-            ).add_to(m)
-        st_folium(m, width=1100, height=400)
-        
-        # PROSES PEMBENTUKAN GRIDDING KONTUR SURFER (INTERPOLASI IDW)
+        # Proses Gridding Interpolasi Spasial IDW
         x, y = df['Longitude'].values, df['Latitude'].values
-        x_line = np.linspace(x.min() - 0.002, x.max() + 0.002, 100)
-        y_line = np.linspace(y.min() - 0.002, y.max() + 0.002, 100)
+        x_line = np.linspace(min_lon, max_lon, 150)
+        y_line = np.linspace(min_lat, max_lat, 150)
         xi, yi = np.meshgrid(x_line, y_line)
         
         zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # Fungsi Plotter Pengganti Tampilan Surfer (Filled Contours 2D + Satelit Mapbox Alpha Layer)
-        def create_surfer_2d_contour(zi_data, colorscale_name, title_lbl):
-            fig = go.Figure()
-            
-            # 1. Overlay kontur padat berwarna (Surfer Style Fill Colors)
-            fig.add_trace(go.Contour(
-                z=zi_data, x=x_line, y=y_line,
-                colorscale=colorscale_name,
-                line=dict(color="black", width=0.8), # Kontur garis hitam halus seperti di Surfer
-                contours=dict(showlabels=True, labelfont=dict(size=10, color="black")),
-                colorbar=dict(title=title_lbl, thickness=15, titleside="right")
-            ))
-            
-            # 2. Plotting Titik Posisi Lapangan
-            fig.add_trace(go.Scatter(
-                x=x, y=y, mode="markers+text",
-                text=df['Titik'].astype(str),
-                textposition="top center",
-                marker=dict(color="black", size=6, symbol="x"),
-                name="Titik Ukur",
-                showlegend=False
-            ))
-            
-            # Layouting Bounding Box Koordinat presisi menyerupai plot cetak Surfer
-            fig.update_layout(
-                mapbox=dict(
-                    style="satellite", # Integrasi basemap satelit di latar bawah kontur
-                    center=dict(lat=center_lat, lon=center_lon),
-                    zoom=14, layers=[]
-                ),
-                xaxis=dict(title="Longitude (Degree)", showgrid=True, gridcolor="rgba(0,0,0,0.1)", mirror=True, ticks="outside"),
-                yaxis=dict(title="Latitude (Degree)", showgrid=True, gridcolor="rgba(0,0,0,0.1)", mirror=True, ticks="outside"),
-                margin=dict(l=50, r=10, b=50, t=20),
-                height=380, width=500,
-                plot_bgcolor="white"
-            )
-            return fig
-
-        st.markdown('<div class="section-title">Peta 2, 3, & 4: Output Model 2D Filled Contour Map (Surfer Replica Style)</div>', unsafe_allow_html=True)
-        st.write("📈 *Tampilan visualisasi kontur di bawah mengadopsi fitur `Fill Colors` dan `Major/Minor Contours Line` Surfer dengan penempatan stasiun ukur (x).*")
+        # Pembuatan Matriks Gambar Overlay Kontur bergaya Surfer
+        img_a0 = create_contour_overlay(xi, yi, zi_a0, 'viridis')
+        img_f0 = create_contour_overlay(xi, yi, zi_f0, 'plasma')
+        img_kg = create_contour_overlay(xi, yi, zi_kg, 'jet')
         
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:15px;'>Peta 2: Kontur Amplifikasi Situs (A₀ Map)</h4>", unsafe_allow_html=True)
-            st.plotly_chart(create_surfer_2d_contour(zi_a0, "Viridis", "Nilai A₀"), use_container_width=True)
+        # FUNGSI GENERATOR UTAMA PETA SATELLITE + OVERLAY KONTUR + INTERACTIVE POPUP
+        def generate_mikrozonasi_map(overlay_img=None):
+            m = folium.Map(
+                location=[center_lat, center_lon], zoom_start=15,
+                tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+                attr='Google Satellite Imagery'
+            )
             
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:15px;'>Peta 4: Kontur Kerentanan Seismik (Kg Map)</h4>", unsafe_allow_html=True)
-            st.plotly_chart(create_surfer_2d_contour(zi_kg, "Jet", "Nilai K_g"), use_container_width=True)
+            # Pasang Gambar Kontur Berwarna Padat (Filled Contours) di atas Satelit jikalau parameter diisi
+            if overlay_img is not None:
+                folium.raster_layers.ImageOverlay(
+                    image=overlay_img,
+                    bounds=bounds,
+                    opacity=0.6,  # Transparansi agar peta dasar satelit bumi tetap terlihat di bawah kontur
+                    mercator_project=True
+                ).add_to(m)
+                
+            # Pasang Marker Titik Pengukuran Lapangan dengan Fitur Interaktif Klik Laporan Detail
+            for _, row in df.iterrows():
+                popup_html = f"""
+                <div style='font-family: Arial, sans-serif; font-size: 12px; width: 180px;'>
+                    <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Stasiun {row['Titik']}</b></h5>
+                    <b>Latitude:</b> {row['Latitude']:.5f}<br>
+                    <b>Longitude:</b> {row['Longitude']:.5f}<br>
+                    <hr style='margin:5px 0;'>
+                    <span style='color:#0D9488;'><b>f₀ (Frekuensi):</b> {row['f0']:.2f} Hz</span><br>
+                    <span style='color:#EA580C;'><b>A₀ (Amplifikasi):</b> {row['A0']:.2f}</span><br>
+                    <span style='background-color:#FEF2F2; padding:2px 4px; border-radius:3px; display:inline-block; margin-top:3px;'>
+                        <b>K_g (Kerentanan):</b> <span style='color:#991B1B;'><b>{row['Kg']:.2f}</b></span>
+                    </span>
+                </div>
+                """
+                folium.CircleMarker(
+                    location=[row['Latitude'], row['Longitude']], radius=7,
+                    popup=folium.Popup(popup_html, max_width=250),
+                    color='black', weight=1.5,
+                    fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=0.9
+                ).add_to(m)
+            return m
+
+        # TAB LAYOUTING UNTUK MENAMPILKAN 4 OUTPUT SEKALIGUS SECARA RAPI
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📌 Peta 1: Peta Sebaran Stasiun", 
+            "🟢 Peta 2: Kontur Amplifikasi (A₀)", 
+            "🟣 Peta 3: Kontur Frekuensi Dominan (f₀)", 
+            "🔴 Peta 4: Kontur Kerentanan Seismik (K_g)"
+        ])
+        
+        with tab1:
+            st.markdown("#### Peta 1: Lokasi Titik Pengukuran Geofisika Lapangan")
+            st.caption("💡 Klik lingkaran pin untuk memunculkan panel pop-up berisi nomor stasiun dan nilai indeks kerentanan ($K_g$) spesifik.")
+            map_stasiun = generate_mikrozonasi_map(overlay_img=None)
+            st_folium(map_stasiun, width=1100, height=450, key="map_stasiun")
             
-        with col_m2:
-            st.markdown("<h4 style='text-align: center; color: #1E3A8A; font-size:15px;'>Peta 3: Kontur Frekuensi Dominan Tanah (f₀ Map)</h4>", unsafe_allow_html=True)
-            st.plotly_chart(create_surfer_2d_contour(zi_f0, "Plasma", "f₀ (Hz)"), use_container_width=True)
+        with tab2:
+            st.markdown("#### Peta 2: Kuantifikasi Faktor Amplifikasi Lapisan ($A_0$)")
+            st.caption("Model interpolasi warna padat (Filled Contour lines) menggunakan skala standar Matplotlib-Surfer `Viridis` Layer.")
+            map_a0 = generate_mikrozonasi_map(overlay_img=img_a0)
+            st_folium(map_a0, width=1100, height=450, key="map_a0")
             
-            # Mengosongkan kolom kanan bawah agar grid penempatan simetris rapi
-            st.markdown("<br><br><div style='text-align:center; color:#6B7280; font-size:13px; border:2px dashed #E5E7EB; padding:60px; border-radius:10px;'><b>Sistem Gridding Interpolasi Surfer Terintegrasi</b><br>Berhasil memetakan batas koordinat minimum-maximum sesuai lampiran data lapangan.</div>", unsafe_allow_html=True)
+        with tab3:
+            st.markdown("#### Peta 3: Distribusi Nilai Frekuensi Alami Batuan Dasar ($f_0$)")
+            st.caption("Model zonasi batuan keras hingga sedimen lunak bersumber dari hasil gridding penampang warna `Plasma` Layer.")
+            map_f0 = generate_mikrozonasi_map(overlay_img=img_f0)
+            st_folium(map_f0, width=1100, height=450, key="map_f0")
+            
+        with tab4:
+            st.markdown("#### Peta 4: Peta Zonasi Mikro Indeks Kerentanan Seismik ($K_g$)")
+            st.caption("Zona kritis anomali tinggi ditandai dengan warna merah pekat (`Jet Colormap`). Sangat vital sebagai acuan tata ruang konstruksi.")
+            map_kg = generate_mikrozonasi_map(overlay_img=img_kg)
+            st_folium(map_kg, width=1100, height=450, key="map_kg")
 
 # ==========================================
 # MENU 3: ANALISIS RESONANSI
 # ==========================================
 elif menu == "Analisis Resonansi":
     if df is None:
-        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu.")
+        st.warning("Silakan unggah file CSV data lapangan Anda terlebih dahulu pada panel di atas.")
     else:
-        st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur Mikro Terhadap Bangunan Sekitar</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur terhadap Bangunan Sekitar</div>', unsafe_allow_html=True)
         
         num_floors = st.number_input("Masukkan Jumlah Lantai Bangunan Target yang Disimulasikan (N):", min_value=1, max_value=40, value=3)
         fb = 10.0 / num_floors
         
-        st.markdown(f'<div class="metric-box"><b>Karakteristik Frekuensi Alami Bangunan Rencana (fb):</b> <h2>{fb:.2f} Hz (Untuk Bangunan {num_floors} Lantai)</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-box"><b>Karakteristik Frekuensi Alami Bangunan Rencana (fb):</b> <h2>{fb:.2f} Hz (Untuk Spesifikasi Bangunan Berlantai {num_floors})</h2></div>', unsafe_allow_html=True)
         
         def evaluate_resonance_risk(f0, fb):
             diff = abs(f0 - fb)
@@ -283,7 +300,7 @@ elif menu == "Analisis Resonansi":
         df_res['Kondisi Kerentanan Bangunan'] = df_res.apply(lambda row: evaluate_resonance_risk(row['f0'], fb), axis=1)
         
         st.write("")
-        st.markdown("**Tabel Hasil Komparasi Parameter Frekuensi Dominan Tanah vs Bangunan (Baris-per-Baris):**")
+        st.markdown("**Tabel Hasil Komparasi Parameter Frekuensi Dominan Tanah vs Bangunan Sekitar:**")
         
         def color_rows(row):
             status = row['Kondisi Kerentanan Bangunan']
@@ -299,8 +316,8 @@ elif menu == "Analisis Resonansi":
         st.markdown("""
         <div class="ref-box">
         <b>Catatan Interpretasi Risiko Resonansi Struktur:</b><br>
-        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi alami tanah ($f_0$) dan bangunan ($f_b$) sangat dekat ($\leq 0.5$ Hz). Bangunan rentan mengalami kerusakan fatal akibat fenomena resonansi gelombang seismik.<br>
-        • <b>Risiko Sedang (Kuning):</b> Selisih frekuensi berada di rentang $0.5$ hingga $1.5$ Hz. Direkomendasikan menambah pengaku/perkuatan lateral pada struktur kolom utama.<br>
-        • <b>Risiko Rendah (Hijau):</b> Selisih frekuensi $> 1.5$ Hz. Struktur aman karena karakteristik getaran tanah lokal dan fondasi gedung tidak saling menguatkan.
+        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi alami tanah ($f_0$) dan bangunan ($f_b$) sangat dekat ($\leq 0.5$ Hz). Bangunan rentan mengalami guncangan ganda ekstrem jika terjadi gempa bumi karena gelombang saling menguatkan.<br>
+        • <b>Risiko Sedang (Kuning):</b> Selisih frekuensi berada di rentang $0.5$ hingga $1.5$ Hz. Direkomendasikan melakukan perkuatan struktural atau rekayasa kekakuan kolom fondasi utama.<br>
+        • <b>Risiko Rendah (Hijau):</b> Selisih frekuensi $> 1.5$ Hz. Struktur aman dari bahaya amplifikasi kerusakan akibat getaran resonansi lapisan tanah lokal.
         </div>
         """, unsafe_allow_html=True)
