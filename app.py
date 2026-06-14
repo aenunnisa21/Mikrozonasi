@@ -248,7 +248,68 @@ elif menu == "Analisis Resonansi":
     if df is None:
         st.warning("Silakan unggah data lapangan CSV terlebih dahulu.")
     else:
-        st.markdown('<div class="section-title">Analisis Bahaya Resonansi Struktur</div>', unsafe_allow_html=True)
-        num_floors = st.number_input("Masukkan Jumlah Lantai Bangunan (N):", min_value=1, max_value=30, value=3)
-        fb = 10.0 / num_floors
-        st.info(f"Frekuensi Alami Bangunan Estimasian ($f_b$): {fb:.2f} Hz")
+        st.markdown(
+            '<div class="section-title">Analisis Bahaya Resonansi Struktur</div>',
+            unsafe_allow_html=True
+        )
+
+        st.markdown("""
+        **Dasar Teori**
+
+        Analisis ini menggunakan pendekatan empiris periode alami bangunan:
+
+        T = 0.1N
+
+        dimana:
+        - T = periode alami bangunan (detik)
+        - N = jumlah lantai
+
+        Frekuensi alami bangunan dihitung dengan:
+
+        f_b = 1/T
+
+        Resonansi berpotensi terjadi ketika frekuensi dominan tanah (f₀)
+        mendekati frekuensi alami bangunan (f_b).
+        """)
+
+        num_floors = st.number_input(
+            "Masukkan Jumlah Lantai Bangunan (N):",
+            min_value=1,
+            max_value=30,
+            value=3
+        )
+
+        # Periode dan frekuensi bangunan
+        T = 0.1 * num_floors
+        fb = 1 / T
+
+        st.info(
+            f"Periode Bangunan (T) = {T:.2f} s | "
+            f"Frekuensi Alami Bangunan (f_b) = {fb:.2f} Hz"
+        )
+
+        # Hitung rasio kedekatan frekuensi
+        df_res = df.copy()
+
+        df_res["f_b"] = fb
+        df_res["Rasio"] = abs(df_res["f0"] - fb) / fb
+
+        def klasifikasi_resonansi(r):
+            if r < 0.10:
+                return "Tinggi"
+            elif r < 0.30:
+                return "Sedang"
+            else:
+                return "Rendah"
+
+        df_res["Risiko Resonansi"] = df_res["Rasio"].apply(
+            klasifikasi_resonansi
+        )
+
+        st.subheader("Hasil Analisis Resonansi")
+
+        st.dataframe(
+            df_res[
+                ["Titik", "f0", "f_b", "Risiko Resonansi"]
+            ]
+        )
