@@ -147,11 +147,11 @@ elif menu == "Mikrozonasi Spasial":
     if df is None:
         st.warning("Silakan unggah data lapangan CSV terlebih dahulu.")
     else:
-        st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Google Satellite Overlay)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Google Satellite)</div>', unsafe_allow_html=True)
         
         # Penentuan batas koordinat area secara ketat di area pengukuran
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
-        pad = 0.002  # Ukuran kotak pembatas area zonasi agar presisi
+        pad = 0.002  # Ukuran kotak pembatas area zonasi agar pas dengan sebaran data
         min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
         min_lon, max_lon = df['Longitude'].min() - pad, df['Longitude'].max() + pad
         bounds = [[min_lat, min_lon], [max_lat, max_lon]]
@@ -166,51 +166,80 @@ elif menu == "Mikrozonasi Spasial":
         zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
         zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
         
-        # Pembuatan Gambar Raster Kontur Padat Bersih (Tanpa Axis Koordinat)
-        img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'rainbow') # Kombinasi spektrum QGIS
+        # Pembuatan Gambar Raster Kontur Padat Murni Bersih (Tanpa Teks Sumbu/Aksis Koordinat)
+        img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'rainbow') # Skema spektrum QGIS/Surfer
         img_f0 = create_surfer_contour_overlay(xi, yi, zi_f0, 'viridis')
-        img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'jet')     # Khas skema warna Surfer
+        img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'jet')     # Skema Jet andalan Surfer
         
-        # Fungsi Renderer Utama Peta Satelit + Layer Kontur
-        def generate_mikrozonasi_map(overlay_img):
+        # --- FUNGSI UTAMA GENERATOR INTERAKTIF FOLIUM ---
+        def generate_mikrozonasi_map(overlay_img=None, is_peta_1=False):
+            # Inisialisasi basemap murni Google Satellite untuk semua nomor peta
             m = folium.Map(
                 location=[center_lat, center_lon], zoom_start=16,
                 tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
                 attr='Google Satellite Imagery'
             )
             
-            # Blending kontur bersih tanpa tepi putih ke atas peta Google Satellite
-            folium.raster_layers.ImageOverlay(
-                image=overlay_img,
-                bounds=bounds,
-                opacity=0.55,  # Nilai opasitas agar morfologi satelit di bawahnya terlihat samar
-                mercator_project=True
-            ).add_to(m)
+            # Jika Peta 2, 3, atau 4 (overlay_img diisi), tempelkan raster konturnya ke peta
+            if overlay_img is not None:
+                folium.raster_layers.ImageOverlay(
+                    image=overlay_img,
+                    bounds=bounds,
+                    opacity=0.60,  # Nilai transparansi agar rona satelit di bawah kontur tetap terlihat
+                    mercator_project=True
+                ).add_to(m)
             
-            # Plotting stasiun ukur (lingkaran kecil hitam tegas khas aplikasi GIS)
+            # Pembuatan titik stasiun ukur sirkular (Style minimalis GIS)
             for _, row in df.iterrows():
-                popup_html = f"<b>Stasiun {row['Titik']}</b><br>f0: {row['f0']:.2f} Hz<br>A0: {row['A0']:.2f}<br>Kg: {row['Kg']:.2f}"
+                if is_peta_1:
+                    # Kebutuhan Peta 1: Popup eksklusif hanya Titik ke-berapa dan Nilai Koordinatnya
+                    popup_html = f"""
+                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 140px;'>
+                        <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
+                        <b>Latitude:</b> {row['Latitude']:.5f}<br>
+                        <b>Longitude:</b> {row['Longitude']:.5f}
+                    </div>
+                    """
+                else:
+                    # Kebutuhan Peta 2, 3, 4: Popup fungsional parameter mikrotremor lengkap
+                    popup_html = f"<b>Stasiun {row['Titik']}</b><br>f0: {row['f0']:.2f} Hz<br>A0: {row['A0']:.2f}<br>Kg: {row['Kg']:.2f}"
+                
                 folium.CircleMarker(
-                    location=[row['Latitude'], row['Longitude']], radius=4.5,
-                    popup=folium.Popup(popup_html, max_width=150),
-                    color='black', weight=1.0,
+                    location=[row['Latitude'], row['Longitude']], radius=5,
+                    popup=folium.Popup(popup_html, max_width=180),
+                    color='black', weight=1.2,
                     fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
                 ).add_to(m)
             return m
 
-        tab1, tab2, tab3 = st.tabs([
-            "🟢 Peta 1: Kontur Amplifikasi ($A_0$)", 
-            "🟣 Peta 2: Kontur Frekuensi Dominan ($f_0$)", 
-            "🔴 Peta 3: Kontur Kerentanan Seismik ($K_g$)"
+        # Pembagian Output ke dalam 4 Modul Tab Navigasi Berurutan
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "📌 Peta 1: Kerentanan Seismik (Titik Koordinat)", 
+            "🟢 Peta 2: Peta Kontur Amplifikasi ($A_0$)", 
+            "🟣 Peta 3: Peta Kontur Frekuensi Dominan ($f_0$)", 
+            "🔴 Peta 4: Peta Kontur Indeks Kerentanan ($K_g$)"
         ])
         
         with tab1:
-            st_folium(generate_mikrozonasi_map(img_a0), width=1100, height=520, key="map_a0")
+            st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
+            st.caption("💡 Petunjuk: Klik pada bulatan titik stasiun untuk memeriksa data letak posisi geografisnya (Titik ke-n beserta koordinat Lintang/Bujurnya).")
+            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_koordinat")
+            
         with tab2:
-            st_folium(generate_mikrozonasi_map(img_f0), width=1100, height=520, key="map_f0")
+            st.markdown("#### Peta 2: Visualisasi Kontur Padat Faktor Amplifikasi Situs ($A_0$)")
+            st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
+            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_a0_clean")
+            
         with tab3:
-            st_folium(generate_mikrozonasi_map(img_kg), width=1100, height=520, key="map_kg")
-
+            st.markdown("#### Peta 3: Visualisasi Kontur Padat Frekuensi Dominan Tanah ($f_0$)")
+            st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
+            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_f0_clean")
+            
+        with tab4:
+            st.markdown("#### Peta 4: Visualisasi Kontur Padat Indeks Kerentanan Seismik ($K_g$)")
+            st.caption("✨ Tampilan raster kontur mulus (borderless) tanpa teks aksis koordinat bawaan.")
+            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_kg_clean")
+            
 elif menu == "Analisis Resonansi":
     if df is None:
         st.warning("Silakan unggah data lapangan CSV terlebih dahulu.")
