@@ -178,6 +178,7 @@ elif menu == "Mikrozonasi Spasial":
                 location=[center_lat, center_lon], zoom_start=16,
                 tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
                 attr='Google Satellite Imagery'
+                control_scale=True  # ⚡ BARIS INI YANG MENAMBAHKAN SCALE BAR OTOMATIS (Meter / Miles)
             )
             
             # Jika Peta 2, 3, atau 4 (overlay_img diisi), tempelkan raster konturnya ke peta
