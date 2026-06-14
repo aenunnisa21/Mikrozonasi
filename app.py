@@ -189,10 +189,9 @@ elif menu == "Mikrozonasi Spasial":
                     mercator_project=True
                 ).add_to(m)
             
-            # Pembuatan titik stasiun ukur sirkular (Style minimalis GIS)
-            for _, row in df.iterrows():
-                if is_peta_1:
-                    # Kebutuhan Peta 1: Popup eksklusif hanya Titik ke-berapa dan Nilai Koordinatnya
+# Modifikasi agar titik lingkaran HANYA muncul di Peta 1
+            if is_peta_1:
+                for _, row in df.iterrows():
                     popup_html = f"""
                     <div style='font-family: Arial, sans-serif; font-size: 12px; width: 140px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
@@ -200,9 +199,12 @@ elif menu == "Mikrozonasi Spasial":
                         <b>Longitude:</b> {row['Longitude']:.5f}
                     </div>
                     """
-                else:
-                    # Kebutuhan Peta 2, 3, 4: Popup fungsional parameter mikrotremor lengkap
-                    popup_html = f"<b>Stasiun {row['Titik']}</b><br>f0: {row['f0']:.2f} Hz<br>A0: {row['A0']:.2f}<br>Kg: {row['Kg']:.2f}"
+                    folium.CircleMarker(
+                        location=[row['Latitude'], row['Longitude']], radius=5,
+                        popup=folium.Popup(popup_html, max_width=180),
+                        color='black', weight=1.2,
+                        fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
+                    ).add_to(m)
                 
                 folium.CircleMarker(
                     location=[row['Latitude'], row['Longitude']], radius=5,
