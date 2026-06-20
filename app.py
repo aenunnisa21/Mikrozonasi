@@ -49,10 +49,10 @@ def classify_amplification(a0):
     else: return "Very High"
 
 def classify_soil_kanai(f0):
-    if 6.7 <= f0 <= 20: return "Klas I (Tertiary/Older Rock - Hard)"
-    elif 4 <= f0 < 6.7: return "Klas II (Alluvial 5m - Moderate/Hard)"
-    elif 2.5 <= f0 < 4: return "Klas III (Alluvial >5m - Medium Sediment)"
-    elif f0 < 2.5: return "Klas IV (Alluvial Delta - Very Thick/Soft)"
+    if 6.7 <= f0 <= 20: return "Klas I (Tanah Keras / Batuan Padat)"
+    elif 4 <= f0 < 6.7: return "Klas II (Tanah Sedang / Aluvial Dangkal)"
+    elif 2.5 <= f0 < 4: return "Klas III (Tanah Sedang-Lunak)"
+    elif f0 < 2.5: return "Klas IV (Tanah Lunak / Sedimen Tebal)"
     else: return "Di luar Rentang Standar Kanai (>20 Hz)"
 
 def color_picker_kg(status):
@@ -92,7 +92,7 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# 3. SIDEBAR NAVIGATION (Logo Masjid/UIN Dihapus)
+# 3. SIDEBAR NAVIGATION
 # ==========================================
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-top: 20px;'>🌋 GEOFISIKA</h2>", unsafe_allow_html=True)
@@ -188,18 +188,19 @@ elif menu == "Mikrozonasi Spasial":
             
             if is_peta_1:
                 for _, row in df.iterrows():
+                    # Menampilkan teks nama kelas tanah secara utuh di pop-up peta
                     popup_html = f"""
-                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 160px;'>
+                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 190px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
                         <b>f0:</b> {row['f0']:.2f} Hz<br>
                         <b>A0:</b> {row['A0']:.2f}<br>
                         <b>Kg:</b> {row['Kg']:.2f}<br>
-                        <b>Tanah:</b> {row['Klasifikasi Klas Tanah (Kanai)'].split(' ')[0]}
+                        <b>Situs:</b> {row['Klasifikasi Klas Tanah (Kanai)']}
                     </div>
                     """
                     folium.CircleMarker(
                         location=[row['Latitude'], row['Longitude']], radius=5,
-                        popup=folium.Popup(popup_html, max_width=200),
+                        popup=folium.Popup(popup_html, max_width=250),
                         color='black', weight=1.2,
                         fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
                     ).add_to(m)
