@@ -48,12 +48,18 @@ def classify_amplification(a0):
     elif 6 <= a0 < 9: return "High"
     else: return "Very High"
 
+# --- REVISI KANAI BAHASA INDONESIA ---
 def classify_soil_kanai(f0):
-    if 6.7 <= f0 <= 20: return "Klas I (Tanah Keras / Batuan Padat)"
-    elif 4 <= f0 < 6.7: return "Klas II (Tanah Sedang / Aluvial Dangkal)"
-    elif 2.5 <= f0 < 4: return "Klas III (Tanah Sedang-Lunak)"
-    elif f0 < 2.5: return "Klas IV (Tanah Lunak / Sedimen Tebal)"
-    else: return "Di luar Rentang Standar Kanai (>20 Hz)"
+    if 6.7 <= f0 <= 20: 
+        return "Klas I (Tanah Keras / Batuan Padat)"
+    elif 4 <= f0 < 6.7: 
+        return "Klas II (Tanah Sedang / Aluvial Dangkal)"
+    elif 2.5 <= f0 < 4: 
+        return "Klas III (Tanah Sedang-Lunak)"
+    elif f0 < 2.5: 
+        return "Klas IV (Tanah Lunak / Sedimen Tebal)"
+    else: 
+        return "Di luar Rentang Standar Kanai (>20 Hz)"
 
 def color_picker_kg(status):
     if status == "Rendah": return "green"
@@ -188,14 +194,14 @@ elif menu == "Mikrozonasi Spasial":
             
             if is_peta_1:
                 for _, row in df.iterrows():
-                    # Menampilkan teks nama kelas tanah secara utuh di pop-up peta
+                    # --- REVISI POP-UP PETA ---
                     popup_html = f"""
-                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 190px;'>
+                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 195px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
                         <b>f0:</b> {row['f0']:.2f} Hz<br>
                         <b>A0:</b> {row['A0']:.2f}<br>
                         <b>Kg:</b> {row['Kg']:.2f}<br>
-                        <b>Situs:</b> {row['Klasifikasi Klas Tanah (Kanai)']}
+                        <b>Klas Situs:</b> {row['Klasifikasi Klas Tanah (Kanai)'].split('(')[1].replace(')','').strip()}
                     </div>
                     """
                     folium.CircleMarker(
@@ -262,41 +268,4 @@ elif menu == "Analisis Resonansi":
         bars = ax.barh(y_pos, values, color=bar_colors, height=0.45)
         ax.set_xlabel('Frekuensi (Hz)', fontsize=9)
         ax.set_xlim(0, max(max(values) + 3, 10))
-        ax.grid(axis='x', linestyle='--', alpha=0.5)
-        ax.tick_params(labelsize=9)
-        
-        for bar in bars:
-            width = bar.get_width()
-            ax.text(width + 0.15, bar.get_y() + bar.get_height()/2, f'{width:.2f} Hz', 
-                    va='center', ha='left', fontsize=9, fontweight='bold')
-                    
-        st.pyplot(fig)
-        plt.close(fig)
-        
-        st.write("")
-        st.markdown("**Tabel Deteksi Tingkat Kerentanan Resonansi Bangunan per Stasiun Ukur:**")
-        
-        df_res = df.copy()
-        df_res["f_b (Hz)"] = round(fb, 2)
-        df_res["Selisih Rasio"] = round(abs(df_res["f0"] - fb) / fb, 3)
-        df_res["Risiko Resonansi"] = df_res["Selisih Rasio"].apply(lambda r: "Tinggi" if r < 0.10 else ("Sedang" if r < 0.30 else "Rendah"))
-        
-        def highlight_resonance_rows(row):
-            status = row['Risiko Resonansi']
-            if status == "Tinggi":
-                return ['background-color: #FEE2E2; color: #991B1B'] * len(row)
-            elif status == "Sedang":
-                return ['background-color: #FEF3C7; color: #92400E'] * len(row)
-            return ['background-color: #DCFCE7; color: #166534'] * len(row)
-            
-        styled_df = df_res[['Titik', 'Longitude', 'Latitude', 'f0', 'f_b (Hz)', 'Risiko Resonansi']].style.apply(highlight_resonance_rows, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
-        
-        st.markdown("""
-        <div class="ref-box">
-        <b>Pedoman Interpretasi Bahaya Rekayasa Resonansi Seismik:</b><br>
-        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi getar alami tanah ($f_0$) dan struktur ($f_b$) sangat rapat (Rasio selisih < 10%). Gedung rentan mengalami kehancuran struktural hebat akibat getaran gelombang gempa yang teramplifikasi ekstrem.<br>
-        • <b>Risiko Sedang (Kuning):</b> Rentang rasio berada di angka 10% - 30%. Disarankan melakukan penguatan konstruksi kolom dan fondasi lateral bangunan.<br>
-        • <b>Risiko Rendah (Hijau):</b> Rasio selisih > 30%. Struktur bangunan aman karena karakteristik getar tanah lokal tidak memicu penguatan simpangan gedung.
-        </div>
-        """, unsafe_allow_html=True)
+        ax.grid(axis='x', linestyle='--', alpha=0.5
