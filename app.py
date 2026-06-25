@@ -21,13 +21,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS untuk meniru persis gaya UI di image_24c2e0.jpg
 st.markdown("""
     <style>
-    .main-title { font-size: 32px; font-weight: bold; color: #1E3A8A; margin-bottom: 5px; }
-    .sub-title { font-size: 18px; color: #4B5563; margin-bottom: 20px; }
-    .section-title { font-size: 24px; font-weight: bold; color: #0D9488; margin-top: 25px; margin-bottom: 15px; border-bottom: 2px solid #0D9488; padding-bottom: 5px; }
-    .metric-box { background-color: #F3F4F6; padding: 15px; border-radius: 10px; border-left: 5px solid #1E3A8A; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
-    .ref-box { background-color: #EFF6FF; padding: 15px; border-radius: 8px; border-left: 5px solid #3B82F6; margin-top: 15px; font-size: 13px; color: #1E3A8A; }
+    .main-title { font-size: 30px; font-weight: bold; color: #1E3A8A; margin-bottom: 5px; }
+    .sub-title { font-size: 16px; color: #4B5563; margin-bottom: 25px; }
+    .section-title { font-size: 20px; font-weight: bold; color: #0D9488; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid #0D9488; padding-bottom: 5px; }
+    
+    /* Style Kartu Metrik Ringkasan Statistik */
+    .metric-container { display: flex; gap: 15px; margin-bottom: 20px; }
+    .card-f0 { background-color: #F0F6FF; border-left: 6px solid #2563EB; border-radius: 12px; padding: 15px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    .card-a0 { background-color: #FFF7ED; border-left: 6px solid #EA580C; border-radius: 12px; padding: 15px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    .card-kg { background-color: #F0FDF4; border-left: 6px solid #16A34A; border-radius: 12px; padding: 15px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    .card-title { font-size: 13px; font-weight: bold; color: #4B5563; margin-bottom: 2px; }
+    .card-value { font-size: 28px; font-weight: bold; color: #1F2937; margin: 0; }
+    .card-sub { font-size: 11px; color: #6B7280; margin-top: 4px; }
+    
+    /* Keterangan Parameter Sidebar Box */
+    .sidebar-desc-box { background-color: #EFF6FF; border-radius: 10px; padding: 12px; border: 1px solid #BFDBFE; margin-top: 30px; }
+    .sidebar-desc-title { font-size: 13px; font-weight: bold; color: #1E40AF; margin-bottom: 8px; }
+    .sidebar-desc-item { font-size: 11px; color: #1E3A8A; margin-bottom: 6px; line-height: 1.3; }
+    
+    /* Legenda bawah */
+    .legend-box { background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 15px; margin-top: 15px; }
+    .legend-col-title { font-size: 12px; font-weight: bold; color: #374151; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px; }
+    .legend-item { font-size: 11px; color: #4B5563; margin-bottom: 3px; display: flex; align-items: center; }
+    .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -50,15 +69,15 @@ def classify_amplification(a0):
 
 def classify_soil_kanai(f0):
     if 6.7 <= f0 <= 20: 
-        return "Klas I (Tanah Keras / Batuan Padat)"
+        return "Klas I (Tanah Keras)"
     elif 4 <= f0 < 6.7: 
-        return "Klas II (Tanah Sedang / Aluvial Dangkal)"
+        return "Klas II (Tanah Sedang)"
     elif 2.5 <= f0 < 4: 
         return "Klas III (Tanah Sedang-Lunak)"
     elif f0 < 2.5: 
-        return "Klas IV (Tanah Lunak / Sedimen Tebal)"
+        return "Klas IV (Tanah Lunak)"
     else: 
-        return "Di luar Rentang Standar Kanai (>20 Hz)"
+        return "Tanah Keras (>20 Hz)"
 
 def color_picker_kg(status):
     if status == "Rendah": return "green"
@@ -97,13 +116,24 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
 # ==========================================
-# 3. SIDEBAR NAVIGATION
+# 3. SIDEBAR NAVIGATION & KETERANGAN PARAMETER
 # ==========================================
 with st.sidebar:
-    st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-top: 20px;'>🌋 GEOFISIKA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1E3A8A; margin-top: 15px;'>🌋 GEOFISIKA</h2>", unsafe_allow_html=True)
     st.markdown("---")
     menu = st.radio("Pilih Menu Dashboard:", ["Analisis Kerentanan", "Mikrozonasi Spasial", "Analisis Resonansi"])
     st.markdown("---")
+    
+    # Keterangan Parameter di sudut kiri bawah seperti image_24c2e0.jpg
+    st.markdown("""
+    <div class="sidebar-desc-box">
+        <div class="sidebar-desc-title">🌐 Keterangan Parameter</div>
+        <div class="sidebar-desc-item"><b>📈 f0 (Hz):</b> Frekuensi dominan tanah hasil analisis perbandingan HVSR.</div>
+        <div class="sidebar-desc-item"><b>📉 A0:</b> Amplifikasi maksimum atau faktor perbesaran gelombang situs.</div>
+        <div class="sidebar-desc-item"><b>🛡️ Kg:</b> Indeks kerentanan seismik lapisan tanah makro ($Kg = A_0^2 / f_0$).</div>
+        <div class="sidebar-desc-item"><b>🧱 Klas Tanah:</b> Klasifikasi jenis batuan berdasarkan periode getar Kanai (1957).</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # 4. HEADER UTAMA & UPLOAD DATA
@@ -136,19 +166,97 @@ if uploaded_file is not None:
 df = st.session_state.df_data
 
 # ==========================================
-# MENU MAIN FLOW
+# MENU 1: ANALISIS KERENTANAN (DESAIN TARGET)
 # ==========================================
 if menu == "Analisis Kerentanan":
     if df is None:
         st.warning("Silakan unggah data lapangan CSV terlebih dahulu.")
     else:
         st.markdown('<div class="section-title">Ringkasan Statistik Lapisan</div>', unsafe_allow_html=True)
-        col1, col2, col3 = st.columns(3)
-        col1.markdown(f'<div class="metric-box"><b>Rata-rata f0</b><h2>{df["f0"].mean():.2f} Hz</h2></div>', unsafe_allow_html=True)
-        col2.markdown(f'<div class="metric-box"><b>Rata-rata A0</b><h2>{df["A0"].mean():.2f}</h2></div>', unsafe_allow_html=True)
-        col3.markdown(f'<div class="metric-box"><b>Rata-rata Kg</b><h2>{df["Kg"].mean():.2f}</h2></div>', unsafe_allow_html=True)
-        st.write("")
-        st.dataframe(df[['Titik', 'Longitude', 'Latitude', 'f0', 'Klasifikasi Klas Tanah (Kanai)', 'A0', 'Klasifikasi Amplifikasi Situs', 'Kg', 'Tingkat Kerentanan']], use_container_width=True)
+        
+        # Hitung Nilai Rata-rata, Min, dan Max secara dinamis
+        f0_avg, f0_min, f0_max = df["f0"].mean(), df["f0"].min(), df["f0"].max()
+        a0_avg, a0_min, a0_max = df["A0"].mean(), df["A0"].min(), df["A0"].max()
+        kg_avg, kg_min, kg_max = df["Kg"].mean(), df["Kg"].min(), df["Kg"].max()
+        
+        # Implementasi Kartu Statistik Sesuai Gaya Desain Target
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="card-f0">
+                <div class="card-title">🔵 Rata-rata f0</div>
+                <div class="card-value">{f0_avg:.2f} Hz</div>
+                <div class="card-sub">Min: {f0_min:.2f} Hz &nbsp;|&nbsp; Max: {f0_max:.2f} Hz</div>
+            </div>
+            <div class="card-a0">
+                <div class="card-title">🟠 Rata-rata A0</div>
+                <div class="card-value">{a0_avg:.2f}</div>
+                <div class="card-sub">Min: {a0_min:.2f} &nbsp;|&nbsp; Max: {a0_max:.2f}</div>
+            </div>
+            <div class="card-kg">
+                <div class="card-title">🟢 Rata-rata Kg</div>
+                <div class="card-value">{kg_avg:.2f}</div>
+                <div class="card-sub">Min: {kg_min:.2f} &nbsp;|&nbsp; Max: {kg_max:.2f}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="section-title">Tabel Hasil Analisis Titik Pengukuran</div>', unsafe_allow_html=True)
+        
+        # Buat dataframe salinan khusus tampilan agar nama kolom rapi
+        df_view = df.copy()
+        df_view.insert(0, 'No.', range(1, len(df_view) + 1))
+        
+        # Fungsi pembantu formatting warna sel pandas dataframe styler
+        def style_hvsr_table(val):
+            # Warna untuk Klas Tanah
+            if "Klas I" in str(val): return 'background-color: #DCFCE7; color: #15803D; font-weight: bold;'
+            elif "Klas II" in str(val): return 'background-color: #E0F2FE; color: #0369A1; font-weight: bold;'
+            elif "Klas III" in str(val): return 'background-color: #FEF3C7; color: #B45309; font-weight: bold;'
+            elif "Klas IV" in str(val): return 'background-color: #FEE2E2; color: #B91C1C; font-weight: bold;'
+            
+            # Warna untuk Amplifikasi Situs & Kerentanan
+            elif val in ["Low", "Rendah"]: return 'background-color: #DCFCE7; color: #166534; text-align: center;'
+            elif val in ["Moderate", "Menengah"]: return 'background-color: #FEF3C7; color: #92400E; text-align: center;'
+            elif val in ["High", "Tinggi", "Very High"]: return 'background-color: #FEE2E2; color: #991B1B; text-align: center;'
+            return ''
+
+        # Terapkan styling tabel dinamis ke kolom tertentu
+        styled_table = df_view[[
+            'No.', 'Titik', 'Longitude', 'Latitude', 'f0', 
+            'Klasifikasi Klas Tanah (Kanai)', 'A0', 'Klasifikasi Amplifikasi Situs', 
+            'Kg', 'Tingkat Kerentanan'
+        ]].style.applymap(style_hvsr_table, subset=[
+            'Klasifikasi Klas Tanah (Kanai)', 'Klasifikasi Amplifikasi Situs', 'Tingkat Kerentanan'
+        ])
+        
+        st.dataframe(styled_table, use_container_width=True)
+        
+        # Menambahkan Blok Legenda Klasifikasi di bawah tabel sesuai gambar target
+        st.markdown("""
+        <div class="legend-box">
+            <div class="row" style="display: flex; gap: 20px;">
+                <div style="flex: 1.2;">
+                    <div class="legend-col-title">Klasifikasi Klas Tanah (Kanai)</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #15803D;"></span><b>Klas I (6.7 - 20 Hz):</b> Tanah Keras / Batuan Padat</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #0369A1;"></span><b>Klas II (4.0 - 6.7 Hz):</b> Tanah Sedang / Aluvial Dangkal</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #B45309;"></span><b>Klas III (2.5 - 4.0 Hz):</b> Tanah Sedang-Lunak</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #B91C1C;"></span><b>Klas IV (&lt; 2.5 Hz):</b> Tanah Lunak / Sedimen Tebal</div>
+                </div>
+                <div style="flex: 0.9;">
+                    <div class="legend-col-title">Klasifikasi Amplifikasi Situs (A0)</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #166534;"></span><b>Low:</b> A0 &lt; 3</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #92400E;"></span><b>Moderate:</b> 3 ≤ A0 &lt; 6</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #991B1B;"></span><b>High / Very High:</b> A0 ≥ 6</div>
+                </div>
+                <div style="flex: 0.9;">
+                    <div class="legend-col-title">Tingkat Kerentanan (Kg)</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #166534;"></span><b>Rendah:</b> Kg &lt; 3</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #92400E;"></span><b>Menengah:</b> 3 ≤ Kg ≤ 6</div>
+                    <div class="legend-item"><span class="dot" style="background-color: #991B1B;"></span><b>Tinggi:</b> Kg &gt; 6</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 elif menu == "Mikrozonasi Spasial":
     if df is None:
@@ -195,11 +303,10 @@ elif menu == "Mikrozonasi Spasial":
                 for _, row in df.iterrows():
                     popup_html = f"""
                     <div style='font-family: Arial, sans-serif; font-size: 12px; width: 195px;'>
-                        <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik Ke: {row['Titik']}</b></h5>
+                        <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik: {row['Titik']}</b></h5>
                         <b>f0:</b> {row['f0']:.2f} Hz<br>
                         <b>A0:</b> {row['A0']:.2f}<br>
-                        <b>Kg:</b> {row['Kg']:.2f}<br>
-                        <b>Klas Situs:</b> {row['Klasifikasi Klas Tanah (Kanai)'].split('(')[1].replace(')','').strip()}
+                        <b>Kg:</b> {row['Kg']:.2f}
                     </div>
                     """
                     folium.CircleMarker(
@@ -208,7 +315,6 @@ elif menu == "Mikrozonasi Spasial":
                         color='black', weight=1.2,
                         fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
                     ).add_to(m)
-                    
             return m
 
         tab1, tab2, tab3, tab4 = st.tabs([
@@ -220,16 +326,16 @@ elif menu == "Mikrozonasi Spasial":
         
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
-            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_stable_final")
+            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_perf_final")
         with tab2:
             st.markdown("#### Peta 2: Visualisasi Kontur Padat Faktor Amplifikasi Situs ($A_0$)")
-            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_stable_final")
+            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_perf_final")
         with tab3:
             st.markdown("#### Peta 3: Visualisasi Kontur Padat Frekuensi Dominan Tanah ($f_0$)")
-            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_stable_final")
+            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_perf_final")
         with tab4:
             st.markdown("#### Peta 4: Visualisasi Kontur Padat Indeks Kerentanan Seismik ($K_g$)")
-            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_stable_final")
+            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_perf_final")
             
 elif menu == "Analisis Resonansi":
     if df is None:
@@ -243,7 +349,6 @@ elif menu == "Analisis Resonansi":
         fb = 1.0 / T
         f0_mean = df["f0"].mean()
         
-        # Menampilkan kotak f0 rata-rata dan fb bangunan rencana secara simetris
         col_r1, col_r2 = st.columns(2)
         col_r1.markdown(f'<div class="metric-box"><b>Frekuensi Alami Tanah (f₀) Rata-rata</b><h2>{f0_mean:.2f} Hz</h2></div>', unsafe_allow_html=True)
         col_r2.markdown(f'<div class="metric-box"><b>Frekuensi Alami Bangunan (f_b) Estimasian</b><h2>{fb:.2f} Hz</h2></div>', unsafe_allow_html=True)
