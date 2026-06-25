@@ -310,13 +310,11 @@ elif menu == "Mikrozonasi Spasial":
         
         # Fungsi untuk membuat kalimat interpretasi dinamis di popup
         def get_popup_interpretation(f0_val, a0_val):
-            # Logika Sedimen (berdasarkan Kanai)
             if f0_val < 2.5: soil_text = "Sedimen lunak"
             elif f0_val < 4.0: soil_text = "Sedimen sedang-lunak"
             elif f0_val < 6.7: soil_text = "Sedimen sedang"
             else: soil_text = "Batuan keras/padat"
             
-            # Logika Amplifikasi
             if a0_val < 3: amp_text = "potensi amplifikasi rendah"
             elif a0_val < 6: amp_text = "potensi amplifikasi sedang"
             else: amp_text = "potensi amplifikasi tinggi"
@@ -356,14 +354,13 @@ elif menu == "Mikrozonasi Spasial":
             
             if is_peta_1:
                 for _, row in df.iterrows():
-                    # Menambahkan kalimat interpretasi ke dalam popup HTML
                     interp_text = get_popup_interpretation(row['f0'], row['A0'])
                     popup_html = f"""
                     <div style='font-family: Arial, sans-serif; font-size: 12px; width: 220px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik: {row['Titik']}</b></h5>
-                        <b>$f_0$:</b> {row['f0']:.2f} Hz<br>
-                        <b>$A_0$:</b> {row['A0']:.2f}<br>
-                        <b>$K_g$:</b> {row['Kg']:.2f}<br>
+                        <b>f0:</b> {row['f0']:.2f} Hz<br>
+                        <b>A0:</b> {row['A0']:.2f}<br>
+                        <b>Kg:</b> {row['Kg']:.2f}<br>
                         <div style='margin-top: 5px; padding-top: 5px; border-top: 1px dashed #CCC; color: #4B5563;'>
                             <b>Interpretasi:</b> <i>{interp_text}</i>
                         </div>
@@ -378,17 +375,15 @@ elif menu == "Mikrozonasi Spasial":
 
         tab1, tab2, tab3, tab4 = st.tabs([
             "📌 Peta 1: Kerentanan Seismik", 
-            "🟢 Peta 2: Kontur Amplifikasi ($A_0$)", 
-            "🟣 Peta 3: Kontur Frekuensi ($f_0$)", 
-            "🔴 Peta 4: Kontur Kerentanan ($K_g$)"
+            "🟢 Peta 2: Kontur Amplifikasi (A0)", 
+            "🟣 Peta 3: Kontur Frekuensi (f0)", 
+            "🔴 Peta 4: Kontur Kerentanan (Kg)"
         ])
         
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
             m1 = generate_mikrozonasi_map(overlay_img=None, is_peta_1=True)
             st_folium(m1, width=1100, height=520, key="peta_1_spasial")
-            
-            # Tombol Download untuk Peta 1
             st.download_button(
                 label="📥 Unduh Peta 1 (HTML Interaktif)",
                 data=m1.get_root().render(),
@@ -396,31 +391,9 @@ elif menu == "Mikrozonasi Spasial":
                 mime="text/html",
                 use_container_width=True
             )
-            
-            st.markdown("""
-            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-top: 12px;">
-                <span style="font-size: 12px; font-weight: bold; color: #374151; display: block; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px;">
-                    📊 Keterangan Klasifikasi Warna Titik Pengukuran (Indeks Kerentanan - $K_g$):
-                </span>
-                <div style="display: flex; gap: 25px; flex-wrap: wrap;">
-                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: green; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Hijau (Rendah):</b> $K_g < 3$ (Lapisan batuan cenderung stabil/keras)
-                    </div>
-                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: orange; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Jingga (Menengah):</b> $3 \le K_g \le 6$ (Tingkat kerentanan moderat)
-                    </div>
-                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Merah (Tinggi):</b> $K_g > 6$ (Zona rawan deformasi tinggi/tanah lunak)
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
         with tab2:
-            st.markdown("#### Peta 2: Visualisasi Kontur Faktor Amplifikasi Situs ($A_0$)")
+            st.markdown("#### Peta 2: Visualisasi Kontur Faktor Amplifikasi Situs (A0)")
             m2 = generate_mikrozonasi_map(img_a0, is_peta_1=False)
             st_folium(m2, width=1100, height=520, key="peta_2_amplifikasi")
             st.download_button(
@@ -432,7 +405,7 @@ elif menu == "Mikrozonasi Spasial":
             )
 
         with tab3:
-            st.markdown("#### Peta 3: Visualisasi Kontur Frekuensi Dominan Tanah ($f_0$)")
+            st.markdown("#### Peta 3: Visualisasi Kontur Frekuensi Dominan Tanah (f0)")
             m3 = generate_mikrozonasi_map(img_f0, is_peta_1=False)
             st_folium(m3, width=1100, height=520, key="peta_3_frekuensi")
             st.download_button(
@@ -444,7 +417,7 @@ elif menu == "Mikrozonasi Spasial":
             )
 
         with tab4:
-            st.markdown("#### Peta 4: Visualisasi Kontur Indeks Kerentanan Seismik ($K_g$)")
+            st.markdown("#### Peta 4: Visualisasi Kontur Indeks Kerentanan Seismik (Kg)")
             m4 = generate_mikrozonasi_map(img_kg, is_peta_1=False)
             st_folium(m4, width=1100, height=520, key="peta_4_kerentanan")
             st.download_button(
@@ -455,31 +428,7 @@ elif menu == "Mikrozonasi Spasial":
                 use_container_width=True
             )
 
-     # Keterangan Klasifikasi Warna Titik yang lebih singkat & bersih
-            st.markdown("""
-            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-top: 12px;">
-                <span style="font-size: 13px; font-weight: bold; color: #374151; display: block; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px;">
-                    📊 Klasifikasi Indeks Kerentanan Seismik (Kg):
-                </span>
-                <div style="display: flex; gap: 25px; flex-wrap: wrap; font-size: 12px; color: #4B5563;">
-                    <div style="display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: green; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Hijau (Rendah):</b> Kg &lt; 3 (Batuan keras / stabil)
-                    </div>
-                    <div style="display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: orange; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Jingga (Menengah):</b> 3 ≤ Kg ≤ 6 (Kerentanan sedang)
-                    </div>
-                    <div style="display: flex; align-items: center;">
-                        <span style="height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
-                        <b>Merah (Tinggi):</b> Kg &gt; 6 (Tanah lunak / rawan gempa)
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # Bagian ini diletakkan di luar struktur tab (paling bawah menu 2)
-        # Panduan Interpretasi yang ringkas dan to-the-point
+        # Panduan singkat interpretasi diletakkan paling bawah menu
         st.markdown("""
         <div class="ref-box">
         <b>💡 Panduan Singkat Interpretasi Peta Kontur:</b><br>
