@@ -455,13 +455,37 @@ elif menu == "Mikrozonasi Spasial":
                 use_container_width=True
             )
 
-        # Keterangan analisis fisis makro untuk interpretasi peta zonasi kontur (IDW)
+     # Keterangan Klasifikasi Warna Titik yang lebih singkat & bersih
+            st.markdown("""
+            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-top: 12px;">
+                <span style="font-size: 13px; font-weight: bold; color: #374151; display: block; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px;">
+                    📊 Klasifikasi Indeks Kerentanan Seismik (Kg):
+                </span>
+                <div style="display: flex; gap: 25px; flex-wrap: wrap; font-size: 12px; color: #4B5563;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: green; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Hijau (Rendah):</b> Kg &lt; 3 (Batuan keras / stabil)
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: orange; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Jingga (Menengah):</b> 3 ≤ Kg ≤ 6 (Kerentanan sedang)
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Merah (Tinggi):</b> Kg &gt; 6 (Tanah lunak / rawan gempa)
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Bagian ini diletakkan di luar struktur tab (paling bawah menu 2)
+        # Panduan Interpretasi yang ringkas dan to-the-point
         st.markdown("""
         <div class="ref-box">
-        <b>💡 Panduan Interpretasi Spasial Peta Kontur Mikrozonasi:</b><br>
-        • <b>Zona Kontur Amplifikasi ($A_0$):</b> Area dengan warna mendekati spektrum merah (nilai tinggi) menunjukkan situs batuan lunak/sedimen tebal yang berpotensi mengalami perbesaran amplitudo gelombang gempa yang kuat saat terjadi guncangan.<br>
-        • <b>Zona Kontur Frekuensi Dominan ($f_0$):</b> Nilai rendah (warna dingin/gelap pada kontur viridis) mengindikasikan lapisan sedimen yang tebal (tanah lunak), sedangkan nilai tinggi (warna terang) mencerminkan batuan dasar yang dangkal atau tanah keras.<br>
-        • <b>Zona Kontur Indeks Kerentanan ($K_g$):</b> Merupakan parameter utama tingkat risiko kerusakan akibat gempa bumi. Area dengan kontur berwarna merah (skala <i>jet</i>) wajib diwaspadai karena memiliki kombinasi nilai amplifikasi tinggi dan frekuensi rendah, menandakan zona paling rentan terhadap deformasi tanah jika terjadi gempa bumi.
+        <b>💡 Panduan Singkat Interpretasi Peta Kontur:</b><br>
+        • <b>Kontur Amplifikasi (A0):</b> Warna <b>merah</b> (nilai tinggi) = Risiko perbesaran guncangan gempa kuat.<br>
+        • <b>Kontur Frekuensi Dominan (f0):</b> Nilai <b>rendah</b> (warna gelap) = Lapisan sedimen/tanah lunak tebal.<br>
+        • <b>Kontur Kerentanan Seismik (Kg):</b> Warna <b>merah</b> = Zona paling rawan kerusakan dan deformasi tanah.
         </div>
         """, unsafe_allow_html=True)
         
