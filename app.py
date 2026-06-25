@@ -55,9 +55,6 @@ st.markdown("""
     .legend-item { font-size: 11px; color: #4B5563; margin-bottom: 3px; display: flex; align-items: center; }
     .dot { height: 8px; width: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     .ref-box { background-color: #F8FAFC; border-left: 4px solid #64748B; padding: 12px; border-radius: 6px; font-size: 12px; color: #334155; line-height: 1.5; margin-top: 15px; }
-    
-    /* Kotak Mapping Pengaturan Kolom */
-    .mapper-box { background-color: #FAFAFA; border: 1px dashed #D1D5DB; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -147,14 +144,12 @@ uploaded_file = st.file_uploader("Unggah File CSV Pengukuran Mikrotremor:", type
 
 if uploaded_file is not None:
     try:
-        # Membaca mentah data CSV
         df_raw = pd.read_csv(uploaded_file, sep=None, engine='python')
-        df_raw.columns = df_raw.columns.str.strip() # bersihkan spasi nama kolom asli
+        df_raw.columns = df_raw.columns.str.strip() 
         
         st.markdown('<div class="section-title">⚙️ Konfigurasi Penyesuaian Format Kolom (CSV Mapper)</div>', unsafe_allow_html=True)
         st.info("Format kolom file Anda tidak langsung cocok? Silakan sesuaikan pilihan drop-down di bawah ini agar sesuai dengan format aplikasi.")
         
-        # Logika sistem mencarikan tebakan awal (auto-detect) agar user tidak lelah memilih dari nol
         def auto_guess(options, keywords):
             for opt in options:
                 if any(k in opt.lower() for k in keywords):
@@ -163,7 +158,6 @@ if uploaded_file is not None:
 
         columns_list = list(df_raw.columns)
         
-        # Tampilan Antarmuka Pencocokan Kolom (2 baris agar rapi)
         col1, col2, col3 = st.columns(3)
         with col1:
             mapped_titik = st.selectbox("1. Kolom Identitas / Nama Titik:", columns_list, index=auto_guess(columns_list, ['titik', 'nama', 'station', 'id']))
@@ -182,7 +176,6 @@ if uploaded_file is not None:
             proses_btn = st.button("🔄 Terapkan & Proses Data", use_container_width=True, type="primary")
 
         if proses_btn:
-            # Duplikasi data dan ganti namanya berdasarkan pilihan manual user
             df_mapped = df_raw.rename(columns={
                 mapped_titik: 'Titik',
                 mapped_lon: 'Longitude',
@@ -191,24 +184,19 @@ if uploaded_file is not None:
                 mapped_a0: 'A0'
             })
             
-            # Filter hanya kolom yang dibutuhkan aplikasi
             required_cols = ['Titik', 'Longitude', 'Latitude', 'f0', 'A0']
             df_final = df_mapped[required_cols].copy()
             
-            # Konversi paksa data koordinat dan hvsr menjadi numerik angka
             for c in ['f0', 'A0', 'Latitude', 'Longitude']:
                 df_final[c] = pd.to_numeric(df_final[c], errors='coerce')
                 
-            # Buang baris kosong jika ada kegagalan konversi
             df_final = df_final.dropna(subset=['f0', 'A0', 'Latitude', 'Longitude'])
             
-            # Hitung kalkulasi turunan mikrotremor hvsr
             df_final['Kg'] = calculate_kg(df_final['A0'], df_final['f0'])
             df_final['Tingkat Kerentanan'] = df_final['Kg'].apply(classify_kg)
             df_final['Klasifikasi Klas Tanah (Kanai)'] = df_final['f0'].apply(classify_soil_kanai)
             df_final['Klasifikasi Amplifikasi Situs'] = df_final['A0'].apply(classify_amplification)
             
-            # Simpan hasil final ke dalam Session State streamlit
             st.session_state.df_data = df_final
             st.success("🎉 Data berhasil disesuaikan, dihitung, dan dimuat ke dalam visualisasi dashboard!")
             
@@ -272,32 +260,6 @@ if menu == "Analisis Kerentanan":
         ])
         
         st.dataframe(styled_table, use_container_width=True)
-        
-        st.markdown("""
-        <div class="legend-box">
-            <div class="row" style="display: flex; gap: 20px;">
-                <div style="flex: 1.2;">
-                    <div class="legend-col-title">Klasifikasi Klas Tanah (Kanai)</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #15803D;"></span><b>Klas I (6.7 - 20 Hz):</b> Tanah Keras / Batuan Padat</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #0369A1;"></span><b>Klas II (4.0 - 6.7 Hz):</b> Tanah Sedang / Aluvial Dangkal</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #B45309;"></span><b>Klas III (2.5 - 4.0 Hz):</b> Tanah Sedang-Lunak</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #B91C1C;"></span><b>Klas IV (&lt; 2.5 Hz):</b> Tanah Lunak / Sedimen Tebal</div>
-                </div>
-                <div style="flex: 0.9;">
-                    <div class="legend-col-title">Klasifikasi Amplifikasi Situs (A0)</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #166534;"></span><b>Low:</b> A0 &lt; 3</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #92400E;"></span><b>Moderate:</b> 3 ≤ A0 &lt; 6</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #991B1B;"></span><b>High / Very High:</b> A0 ≥ 6</div>
-                </div>
-                <div style="flex: 0.9;">
-                    <div class="legend-col-title">Tingkat Kerentanan (Kg)</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #166534;"></span><b>Rendah:</b> Kg &lt; 3</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #92400E;"></span><b>Menengah:</b> 3 ≤ Kg ≤ 6</div>
-                    <div class="legend-item"><span class="dot" style="background-color: #991B1B;"></span><b>Tinggi:</b> Kg &gt; 6</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
 # ==========================================
 # MENU 2: MIKROZONASI SPASIAL
@@ -315,164 +277,4 @@ elif menu == "Mikrozonasi Spasial":
         bounds = [[min_lat, min_lon], [max_lat, max_lon]]
         
         x, y = df['Longitude'].values, df['Latitude'].values
-        x_line = np.linspace(min_lon, max_lon, 250)
-        y_line = np.linspace(min_lat, max_lat, 250)
-        xi, yi = np.meshgrid(x_line, y_line)
-        
-        zi_a0 = idw_interpolation(x, y, df['A0'].values, xi, yi)
-        zi_f0 = idw_interpolation(x, y, df['f0'].values, xi, yi)
-        zi_kg = idw_interpolation(x, y, df['Kg'].values, xi, yi)
-        
-        img_a0 = create_surfer_contour_overlay(xi, yi, zi_a0, 'rainbow') 
-        img_f0 = create_surfer_contour_overlay(xi, yi, zi_f0, 'viridis')
-        img_kg = create_surfer_contour_overlay(xi, yi, zi_kg, 'jet')     
-        
-        def generate_mikrozonasi_map(overlay_img=None, is_peta_1=False):
-            m = folium.Map(
-                location=[center_lat, center_lon], zoom_start=16,
-                tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-                attr='Google Satellite Imagery',
-                control_scale=True  
-            )
-            if overlay_img is not None:
-                folium.raster_layers.ImageOverlay(
-                    image=overlay_img, bounds=bounds, opacity=0.60, mercator_project=True
-                ).add_to(m)
-            
-            if is_peta_1:
-                for _, row in df.iterrows():
-                    popup_html = f"""
-                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 195px;'>
-                        <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik: {row['Titik']}</b></h5>
-                        <b>f0:</b> {row['f0']:.2f} Hz<br>
-                        <b>A0:</b> {row['A0']:.2f}<br>
-                        <b>Kg:</b> {row['Kg']:.2f}
-                    </div>
-                    """
-                    folium.CircleMarker(
-                        location=[row['Latitude'], row['Longitude']], radius=5,
-                        popup=folium.Popup(popup_html, max_width=250), color='black', weight=1.2,
-                        fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
-                    ).add_to(m)
-            return m
-
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📌 Peta 1: Kerentanan Seismik (Titik Koordinat)", 
-            "🟢 Peta 2: Peta Kontur Amplifikasi ($A_0$)", 
-            "🟣 Peta 3: Peta Kontur Frekuensi Dominan ($f_0$)", 
-            "🔴 Peta 4: Peta Kontur Indeks Kerentanan ($K_g$)"
-        ])
-        
-        with tab1:
-            st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
-            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_spasial")
-        with tab2:
-            st.markdown("#### Peta 2: Visualisasi Kontur Faktor Amplifikasi Situs ($A_0$)")
-            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_amplifikasi")
-        with tab3:
-            st.markdown("#### Peta 3: Visualisasi Kontur Frekuensi Dominan Tanah ($f_0$)")
-            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_frekuensi")
-        with tab4:
-            st.markdown("#### Peta 4: Visualisasi Kontur Indeks Kerentanan Seismik ($K_g$)")
-            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_kerentanan")
-
-# ==========================================
-# MENU 3: ANALISIS RESONANSI
-# ==========================================
-elif menu == "Analisis Resonansi":
-    if df is None:
-        st.warning("Silakan unggah file CSV dan klik tombol 'Terapkan & Proses Data' di atas.")
-    else:
-        st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur & Mikrotremor Tanah</div>', unsafe_allow_html=True)
-        
-        num_floors = st.number_input("Simulasi Jumlah Lantai Bangunan Rencana (N):", min_value=1, max_value=30, value=3)
-        
-        T = 0.1 * num_floors
-        fb = 1.0 / T
-        f0_mean = df["f0"].mean()
-        
-        avg_ratio = abs(f0_mean - fb) / fb
-        if avg_ratio < 0.10:
-            danger_card_html = """
-            <div class="card-danger-high">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-high">⚠️ TINGGI (Sangat Bahaya)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan &lt; 10%</div>
-            </div>
-            """
-        elif avg_ratio < 0.30:
-            danger_card_html = """
-            <div class="card-danger-mid">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-mid">🟡 SEDANG (Waspada)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan 10% - 30%</div>
-            </div>
-            """
-        else:
-            danger_card_html = """
-            <div class="card-danger-low">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-low">🟢 RENDAH (Aman)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan &gt; 30%</div>
-            </div>
-            """
-
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="card-f0">
-                <div class="card-title">Frekuensi Alami Tanah (f₀) Rata-rata</div>
-                <div class="card-value">{f0_mean:.2f} Hz</div>
-                <div class="card-sub">Berdasarkan data lapangan terunggah</div>
-            </div>
-            <div class="card-a0">
-                <div class="card-title">Frekuensi Alami Bangunan (f_b) Estimasian</div>
-                <div class="card-value">{fb:.2f} Hz</div>
-                <div class="card-sub">Estimasi untuk bangunan {num_floors} Lantai</div>
-            </div>
-            {danger_card_html}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        fig, ax = plt.subplots(figsize=(7, 2.8), dpi=150)
-        categories = ['Frekuensi Bangunan ($f_b$)', 'Frekuensi Getar Tanah ($f_0$)']
-        values = [fb, f0_mean]
-        colors = ['#1E3A8A', '#0D9488']
-        
-        bars = ax.barh(categories, values, color=colors, height=0.45)
-        ax.set_xlabel('Frekuensi (Hz)', fontsize=8, fontweight='bold')
-        ax.set_xlim(0, max(max(values) + 2, 10))
-        ax.tick_params(axis='both', labelsize=8)
-        ax.grid(axis='x', linestyle='--', alpha=0.5)
-        
-        for bar in bars:
-            width = bar.get_width()
-            ax.text(width + 0.15, bar.get_y() + bar.get_height()/2, f'{width:.2f} Hz', 
-                    va='center', ha='left', fontsize=8, fontweight='bold', color='#1F2937')
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        
-        st.markdown("**Tabel Deteksi Tingkat Kerentanan Resonansi Bangunan per Stasiun Ukur:**")
-        
-        df_res = df.copy()
-        df_res["f_b (Hz)"] = round(fb, 2)
-        df_res["Selisih Rasio"] = round(abs(df_res["f0"] - fb) / fb, 3)
-        df_res["Risiko Resonansi"] = df_res["Selisih Rasio"].apply(lambda r: "Tinggi" if r < 0.10 else ("Sedang" if r < 0.30 else "Rendah"))
-        
-        def highlight_resonance_rows(row):
-            status = row['Risiko Resonansi']
-            if status == "Tinggi": return ['background-color: #FEE2E2; color: #991B1B; font-weight: 500;'] * len(row)
-            elif status == "Sedang": return ['background-color: #FEF3C7; color: #92400E; font-weight: 500;'] * len(row)
-            return ['background-color: #DCFCE7; color: #166534; font-weight: 500;'] * len(row)
-            
-        styled_df = df_res[['Titik', 'Longitude', 'Latitude', 'f0', 'f_b (Hz)', 'Risiko Resonansi']].style.apply(highlight_resonance_rows, axis=1)
-        st.dataframe(styled_df, use_container_width=True)
-        
-        st.markdown("""
-        <div class="ref-box">
-        <b>Pedoman Interpretasi Bahaya Rekayasa Resonansi Seismik:</b><br>
-        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi getar alami tanah ($f_0$) dan struktur ($f_b$) sangat rapat (Rasio selisih &lt; 10%). Gedung rentan mengalami kehancuran struktural hebat akibat getaran gelombang gempa yang teramplifikasi ekstrem.<br>
-        • <b>Risiko Sedang (Kuning):</b> Rentang rasio berada di angka 10% - 30%. Disarankan melakukan penguatan konstruksi kolom dan fondasi lateral bangunan.<br>
-        • <b>Risiko Rendah (Hijau):</b> Rasio selisih &gt; 30%. Struktur bangunan aman karena karakteristik getar tanah lokal tidak memicu penguatan simpangan gedung.
-        </div>
-        """, unsafe_allow_html=True)
+        x_line =
