@@ -366,6 +366,30 @@ elif menu == "Mikrozonasi Spasial":
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
             st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_spasial")
+            
+            # Legenda warna marker untuk Peta 1 agar user langsung paham sebaran risikonya
+            st.markdown("""
+            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-top: 12px;">
+                <span style="font-size: 12px; font-weight: bold; color: #374151; display: block; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px;">
+                    📊 Keterangan Klasifikasi Warna Titik Pengukuran (Indeks Kerentanan - $K_g$):
+                </span>
+                <div style="display: flex; gap: 25px; flex-wrap: wrap;">
+                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: green; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Hijau (Rendah):</b> $K_g < 3$ (Lapisan batuan cenderung stabil/keras)
+                    </div>
+                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: orange; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Jingga (Menengah):</b> $3 \le K_g \le 6$ (Tingkat kerentanan moderat)
+                    </div>
+                    <div style="font-size: 11px; color: #4B5563; display: flex; align-items: center;">
+                        <span style="height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; margin-right: 6px; border: 1px solid #000;"></span>
+                        <b>Merah (Tinggi):</b> $K_g > 6$ (Zona rawan deformasi tinggi/tanah lunak)
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
         with tab2:
             st.markdown("#### Peta 2: Visualisasi Kontur Faktor Amplifikasi Situs ($A_0$)")
             st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_amplifikasi")
@@ -376,9 +400,7 @@ elif menu == "Mikrozonasi Spasial":
             st.markdown("#### Peta 4: Visualisasi Kontur Indeks Kerentanan Seismik ($K_g$)")
             st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_kerentanan")
 
-        # ==========================================
-        # TAMBAHAN INFO INTERPRETASI SPASIAL
-        # ==========================================
+        # Keterangan analisis fisis makro untuk interpretasi peta zonasi kontur (IDW)
         st.markdown("""
         <div class="ref-box">
         <b>💡 Panduan Interpretasi Spasial Peta Kontur Mikrozonasi:</b><br>
@@ -387,7 +409,7 @@ elif menu == "Mikrozonasi Spasial":
         • <b>Zona Kontur Indeks Kerentanan ($K_g$):</b> Merupakan parameter utama tingkat risiko kerusakan akibat gempa bumi. Area dengan kontur berwarna merah (skala <i>jet</i>) wajib diwaspadai karena memiliki kombinasi nilai amplifikasi tinggi dan frekuensi rendah, menandakan zona paling rentan terhadap deformasi tanah jika terjadi gempa bumi.
         </div>
         """, unsafe_allow_html=True)
-
+        
 # ==========================================
 # MENU 3: ANALISIS RESONANSI
 # ==========================================
