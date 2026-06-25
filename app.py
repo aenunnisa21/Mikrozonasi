@@ -299,6 +299,15 @@ if menu == "Analisis Kerentanan":
         </div>
         """, unsafe_allow_html=True)
 
+Ide yang sangat bagus! Menambahkan interpretasi otomatis pada popup akan sangat praktis, terutama saat kamu sedang menyusun draf laporan atau proposal studi lapangan, jadi tidak perlu mendeskripsikan ulang satu per satu.
+
+Selain itu, menambahkan fitur unduh (download) akan memungkinkan peta interaktif ini disimpan dalam format HTML—lumayan menghemat waktu dibanding harus memplot atau mengekspor ulang manual dari software eksternal seperti Surfer atau QGIS.
+
+Berikut adalah pembaruan kode untuk MENU 2: MIKROZONASI SPASIAL secara keseluruhan. Saya sudah menambahkan fungsi pembuat kalimat interpretasi dinamis dan tombol download di setiap tab peta.
+
+Silakan timpa blok elif menu == "Mikrozonasi Spasial": sebelumnya dengan kode ini:
+
+Python
 # ==========================================
 # MENU 2: MIKROZONASI SPASIAL
 # ==========================================
@@ -308,6 +317,21 @@ elif menu == "Mikrozonasi Spasial":
     else:
         st.markdown('<div class="section-title">Output Peta Mikrozonasi Spasial (Google Satellite)</div>', unsafe_allow_html=True)
         
+        # Fungsi untuk membuat kalimat interpretasi dinamis di popup
+        def get_popup_interpretation(f0_val, a0_val):
+            # Logika Sedimen (berdasarkan Kanai)
+            if f0_val < 2.5: soil_text = "Sedimen lunak"
+            elif f0_val < 4.0: soil_text = "Sedimen sedang-lunak"
+            elif f0_val < 6.7: soil_text = "Sedimen sedang"
+            else: soil_text = "Batuan keras/padat"
+            
+            # Logika Amplifikasi
+            if a0_val < 3: amp_text = "potensi amplifikasi rendah"
+            elif a0_val < 6: amp_text = "potensi amplifikasi sedang"
+            else: amp_text = "potensi amplifikasi tinggi"
+            
+            return f"{soil_text} dengan {amp_text}."
+
         center_lat, center_lon = df['Latitude'].mean(), df['Longitude'].mean()
         pad = 0.002  
         min_lat, max_lat = df['Latitude'].min() - pad, df['Latitude'].max() + pad
@@ -341,33 +365,47 @@ elif menu == "Mikrozonasi Spasial":
             
             if is_peta_1:
                 for _, row in df.iterrows():
+                    # Menambahkan kalimat interpretasi ke dalam popup HTML
+                    interp_text = get_popup_interpretation(row['f0'], row['A0'])
                     popup_html = f"""
-                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 195px;'>
+                    <div style='font-family: Arial, sans-serif; font-size: 12px; width: 220px;'>
                         <h5 style='margin:0 0 5px 0; color:#1E3A8A; border-bottom:1px solid #CCC; padding-bottom:3px;'><b>Titik: {row['Titik']}</b></h5>
-                        <b>f0:</b> {row['f0']:.2f} Hz<br>
-                        <b>A0:</b> {row['A0']:.2f}<br>
-                        <b>Kg:</b> {row['Kg']:.2f}
+                        <b>$f_0$:</b> {row['f0']:.2f} Hz<br>
+                        <b>$A_0$:</b> {row['A0']:.2f}<br>
+                        <b>$K_g$:</b> {row['Kg']:.2f}<br>
+                        <div style='margin-top: 5px; padding-top: 5px; border-top: 1px dashed #CCC; color: #4B5563;'>
+                            <b>Interpretasi:</b> <i>{interp_text}</i>
+                        </div>
                     </div>
                     """
                     folium.CircleMarker(
                         location=[row['Latitude'], row['Longitude']], radius=5,
-                        popup=folium.Popup(popup_html, max_width=250), color='black', weight=1.2,
+                        popup=folium.Popup(popup_html, max_width=300), color='black', weight=1.2,
                         fill=True, fill_color=color_picker_kg(row['Tingkat Kerentanan']), fill_opacity=1.0
                     ).add_to(m)
             return m
 
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📌 Peta 1: Kerentanan Seismik (Titik Koordinat)", 
-            "🟢 Peta 2: Peta Kontur Amplifikasi ($A_0$)", 
-            "🟣 Peta 3: Peta Kontur Frekuensi Dominan ($f_0$)", 
-            "🔴 Peta 4: Peta Kontur Indeks Kerentanan ($K_g$)"
+            "📌 Peta 1: Kerentanan Seismik", 
+            "🟢 Peta 2: Kontur Amplifikasi ($A_0$)", 
+            "🟣 Peta 3: Kontur Frekuensi ($f_0$)", 
+            "🔴 Peta 4: Kontur Kerentanan ($K_g$)"
         ])
         
         with tab1:
             st.markdown("#### Peta 1: Sebaran Spasial Titik Pengukuran Lapangan")
-            st_folium(generate_mikrozonasi_map(overlay_img=None, is_peta_1=True), width=1100, height=520, key="peta_1_spasial")
+            m1 = generate_mikrozonasi_map(overlay_img=None, is_peta_1=True)
+            st_folium(m1, width=1100, height=520, key="peta_1_spasial")
             
-            # Legenda warna marker untuk Peta 1 agar user langsung paham sebaran risikonya
+            # Tombol Download untuk Peta 1
+            st.download_button(
+                label="📥 Unduh Peta 1 (HTML Interaktif)",
+                data=m1.get_root().render(),
+                file_name="peta_titik_pengukuran.html",
+                mime="text/html",
+                use_container_width=True
+            )
+            
             st.markdown("""
             <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 12px; margin-top: 12px;">
                 <span style="font-size: 12px; font-weight: bold; color: #374151; display: block; margin-bottom: 6px; border-bottom: 1px solid #E5E7EB; padding-bottom: 3px;">
@@ -392,13 +430,39 @@ elif menu == "Mikrozonasi Spasial":
 
         with tab2:
             st.markdown("#### Peta 2: Visualisasi Kontur Faktor Amplifikasi Situs ($A_0$)")
-            st_folium(generate_mikrozonasi_map(img_a0, is_peta_1=False), width=1100, height=520, key="peta_2_amplifikasi")
+            m2 = generate_mikrozonasi_map(img_a0, is_peta_1=False)
+            st_folium(m2, width=1100, height=520, key="peta_2_amplifikasi")
+            st.download_button(
+                label="📥 Unduh Peta 2 (HTML Interaktif)",
+                data=m2.get_root().render(),
+                file_name="peta_kontur_a0.html",
+                mime="text/html",
+                use_container_width=True
+            )
+
         with tab3:
             st.markdown("#### Peta 3: Visualisasi Kontur Frekuensi Dominan Tanah ($f_0$)")
-            st_folium(generate_mikrozonasi_map(img_f0, is_peta_1=False), width=1100, height=520, key="peta_3_frekuensi")
+            m3 = generate_mikrozonasi_map(img_f0, is_peta_1=False)
+            st_folium(m3, width=1100, height=520, key="peta_3_frekuensi")
+            st.download_button(
+                label="📥 Unduh Peta 3 (HTML Interaktif)",
+                data=m3.get_root().render(),
+                file_name="peta_kontur_f0.html",
+                mime="text/html",
+                use_container_width=True
+            )
+
         with tab4:
             st.markdown("#### Peta 4: Visualisasi Kontur Indeks Kerentanan Seismik ($K_g$)")
-            st_folium(generate_mikrozonasi_map(img_kg, is_peta_1=False), width=1100, height=520, key="peta_4_kerentanan")
+            m4 = generate_mikrozonasi_map(img_kg, is_peta_1=False)
+            st_folium(m4, width=1100, height=520, key="peta_4_kerentanan")
+            st.download_button(
+                label="📥 Unduh Peta 4 (HTML Interaktif)",
+                data=m4.get_root().render(),
+                file_name="peta_kontur_kg.html",
+                mime="text/html",
+                use_container_width=True
+            )
 
         # Keterangan analisis fisis makro untuk interpretasi peta zonasi kontur (IDW)
         st.markdown("""
