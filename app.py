@@ -299,15 +299,6 @@ if menu == "Analisis Kerentanan":
         </div>
         """, unsafe_allow_html=True)
 
-Ide yang sangat bagus! Menambahkan interpretasi otomatis pada popup akan sangat praktis, terutama saat kamu sedang menyusun draf laporan atau proposal studi lapangan, jadi tidak perlu mendeskripsikan ulang satu per satu.
-
-Selain itu, menambahkan fitur unduh (download) akan memungkinkan peta interaktif ini disimpan dalam format HTML—lumayan menghemat waktu dibanding harus memplot atau mengekspor ulang manual dari software eksternal seperti Surfer atau QGIS.
-
-Berikut adalah pembaruan kode untuk MENU 2: MIKROZONASI SPASIAL secara keseluruhan. Saya sudah menambahkan fungsi pembuat kalimat interpretasi dinamis dan tombol download di setiap tab peta.
-
-Silakan timpa blok elif menu == "Mikrozonasi Spasial": sebelumnya dengan kode ini:
-
-Python
 # ==========================================
 # MENU 2: MIKROZONASI SPASIAL
 # ==========================================
