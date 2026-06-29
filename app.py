@@ -439,7 +439,7 @@ elif menu == "Mikrozonasi Spasial":
         """, unsafe_allow_html=True)
         
 # ==========================================
-# MENU 3: ANALISIS RESONANSI
+# MENU 3: ANALISIS RESONANSI (VERSI UPDATE)
 # ==========================================
 elif menu == "Analisis Resonansi":
     if df is None:
@@ -447,75 +447,15 @@ elif menu == "Analisis Resonansi":
     else:
         st.markdown('<div class="section-title">Analisis Risiko Resonansi Struktur & Mikrotremor Tanah</div>', unsafe_allow_html=True)
         
+        # 1. Komponen Pilihan Lantai (Tetap Dipertahankan)
         num_floors = st.number_input("Simulasi Jumlah Lantai Bangunan Rencana (N):", min_value=1, max_value=30, value=3)
         
         T = 0.1 * num_floors
         fb = 1.0 / T
-        f0_mean = df["f0"].mean()
         
-        avg_ratio = abs(f0_mean - fb) / fb
-        if avg_ratio < 0.10:
-            danger_card_html = """
-            <div class="card-danger-high">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-high">⚠️ TINGGI (Sangat Bahaya)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan &lt; 10%</div>
-            </div>
-            """
-        elif avg_ratio < 0.30:
-            danger_card_html = """
-            <div class="card-danger-mid">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-mid">🟡 SEDANG (Waspada)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan 10% - 30%</div>
-            </div>
-            """
-        else:
-            danger_card_html = """
-            <div class="card-danger-low">
-                <div class="card-title">⚠️ Potensi Bahaya Resonansi Wilayah</div>
-                <div class="card-value-low">🟢 RENDAH (Aman)</div>
-                <div class="card-sub">Selisih frekuensi alami tanah & bangunan &gt; 30%</div>
-            </div>
-            """
-
-        st.markdown(f"""
-        <div class="metric-container">
-            <div class="card-f0">
-                <div class="card-title">Frekuensi Alami Tanah (f₀) Rata-rata</div>
-                <div class="card-value">{f0_mean:.2f} Hz</div>
-                <div class="card-sub">Berdasarkan data lapangan terunggah</div>
-            </div>
-            <div class="card-a0">
-                <div class="card-title">Frekuensi Alami Bangunan (f_b) Estimasian</div>
-                <div class="card-value">{fb:.2f} Hz</div>
-                <div class="card-sub">Estimasi untuk bangunan {num_floors} Lantai</div>
-            </div>
-            {danger_card_html}
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<br><b>Tabel Deteksi Tingkat Kerentanan Resonansi Bangunan per Stasiun Ukur:</b>", unsafe_allow_html=True)
         
-        fig, ax = plt.subplots(figsize=(7, 2.8), dpi=150)
-        categories = ['Frekuensi Bangunan ($f_b$)', 'Frekuensi Getar Tanah ($f_0$)']
-        values = [fb, f0_mean]
-        colors = ['#1E3A8A', '#0D9488']
-        
-        bars = ax.barh(categories, values, color=colors, height=0.45)
-        ax.set_xlabel('Frekuensi (Hz)', fontsize=8, fontweight='bold')
-        ax.set_xlim(0, max(max(values) + 2, 10))
-        ax.tick_params(axis='both', labelsize=8)
-        ax.grid(axis='x', linestyle='--', alpha=0.5)
-        
-        for bar in bars:
-            width = bar.get_width()
-            ax.text(width + 0.15, bar.get_y() + bar.get_height()/2, f'{width:.2f} Hz', 
-                    va='center', ha='left', fontsize=8, fontweight='bold', color='#1F2937')
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-        
-        st.markdown("**Tabel Deteksi Tingkat Kerentanan Resonansi Bangunan per Stasiun Ukur:**")
-        
+        # 2. Komponen Tabel Analisis (Tetap Dipertahankan)
         df_res = df.copy()
         df_res["f_b (Hz)"] = round(fb, 2)
         df_res["Selisih Rasio"] = round(abs(df_res["f0"] - fb) / fb, 3)
@@ -530,10 +470,11 @@ elif menu == "Analisis Resonansi":
         styled_df = df_res[['Titik', 'Longitude', 'Latitude', 'f0', 'f_b (Hz)', 'Risiko Resonansi']].style.apply(highlight_resonance_rows, axis=1)
         st.dataframe(styled_df, use_container_width=True)
         
+        # 3. Catatan Keterangan Bawah (Tetap Dipertahankan)
         st.markdown("""
         <div class="ref-box">
         <b>Pedoman Interpretasi Bahaya Rekayasa Resonansi Seismik:</b><br>
-        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi getar alami tanah ($f_0$) dan struktur ($f_b$) sangat rapat (Rasio selisih &lt; 10%). Gedung rentan mengalami kehancuran struktural hebat akibat getaran gelombang gempa yang teramplifikasi ekstrem.<br>
+        • <b>Risiko Tinggi (Merah):</b> Selisih frekuensi getar alami tanah ($f_0$) and struktur ($f_b$) sangat rapat (Rasio selisih &lt; 10%). Gedung rentan mengalami kehancuran struktural hebat akibat getaran gelombang gempa yang teramplifikasi ekstrem.<br>
         • <b>Risiko Sedang (Kuning):</b> Rentang rasio berada di angka 10% - 30%. Disarankan melakukan penguatan konstruksi kolom dan fondasi lateral bangunan.<br>
         • <b>Risiko Rendah (Hijau):</b> Rasio selisih &gt; 30%. Struktur bangunan aman karena karakteristik getar tanah lokal tidak memicu penguatan simpangan gedung.
         </div>
